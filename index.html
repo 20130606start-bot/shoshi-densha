@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d4ed8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="電車モード">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>司法書士 電車モード（オフライン）</title>
+<style>
+  :root{
+    --bg:#0f1420; --card:#182131; --card2:#1e293b; --line:#2a3852; --fg:#e8eef7; --sub:#9fb0c8;
+    --maru:#22c55e; --batsu:#ef4444; --accent:#3b82f6; --accent2:#1d4ed8; --warn:#f59e0b;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif; }
+  body{ padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  .wrap{ max-width:560px; margin:0 auto; padding:0 14px 40px; }
+  header{ position:sticky; top:0; z-index:10; background:rgba(15,20,32,.92); backdrop-filter:blur(8px);
+    padding:calc(env(safe-area-inset-top) + 10px) 14px 10px; margin:0 -14px 12px; border-bottom:1px solid var(--line); }
+  .htop{ display:flex; align-items:center; gap:10px; }
+  .htop h1{ font-size:17px; margin:0; flex:1; font-weight:800; letter-spacing:.02em; }
+  .status{ font-size:12px; color:var(--sub); margin-top:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .dot.on{ background:var(--maru); } .dot.off{ background:var(--warn); }
+  button{ font-family:inherit; cursor:pointer; }
+  .iconbtn{ background:var(--card2); color:var(--fg); border:1px solid var(--line); border-radius:10px;
+    padding:8px 12px; font-size:14px; font-weight:700; }
+  .iconbtn:active{ transform:scale(.96); }
+  .chips{ display:flex; gap:8px; overflow-x:auto; padding:4px 0 8px; -webkit-overflow-scrolling:touch; }
+  .chip{ flex:0 0 auto; background:var(--card); color:var(--sub); border:1px solid var(--line);
+    border-radius:999px; padding:7px 14px; font-size:13px; font-weight:700; white-space:nowrap; }
+  .chip.on{ background:var(--accent2); color:#fff; border-color:var(--accent); }
+  .toolrow{ display:flex; align-items:center; gap:10px; margin:2px 0 14px; }
+  .toolrow .grow{ flex:1; color:var(--sub); font-size:13px; }
+  .seg{ display:inline-flex; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button{ background:none; border:none; color:var(--sub); padding:7px 12px; font-size:13px; font-weight:700; }
+  .seg button.on{ background:var(--card2); color:var(--fg); }
+
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; }
+  .meta{ display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .qname{ font-size:12px; color:var(--sub); font-weight:700; }
+  .badge{ font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:var(--card2); color:var(--sub); }
+  .bun{ font-size:17px; line-height:1.75; white-space:pre-wrap; word-break:break-word; }
+  .ansrow{ display:flex; gap:12px; margin-top:18px; }
+  .ansbtn{ flex:1; border:2px solid var(--line); background:var(--card2); color:var(--fg);
+    border-radius:14px; padding:16px 0; font-size:24px; font-weight:800; }
+  .ansbtn.maru{ border-color:rgba(34,197,94,.5); } .ansbtn.batsu{ border-color:rgba(239,68,68,.5); }
+  .ansbtn.pick.maru{ background:rgba(34,197,94,.18); border-color:var(--maru); }
+  .ansbtn.pick.batsu{ background:rgba(239,68,68,.18); border-color:var(--batsu); }
+  .ansbtn.dim{ opacity:.4; }
+  .ansbtn:active{ transform:scale(.98); }
+  .ansbtn .sub{ display:block; font-size:11px; font-weight:700; color:var(--sub); margin-top:4px; }
+
+  .reveal{ margin-top:16px; }
+  .verdict{ font-size:20px; font-weight:900; padding:12px; border-radius:12px; text-align:center; margin-bottom:14px; }
+  .verdict.ok{ background:rgba(34,197,94,.15); color:#5ee89b; }
+  .verdict.ng{ background:rgba(239,68,68,.15); color:#ff8a8a; }
+  .lbl{ font-size:12px; font-weight:800; color:var(--sub); margin:14px 0 6px; letter-spacing:.03em; }
+  .block{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:12px 14px;
+    font-size:15px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
+  .block.reason{ border-color:rgba(34,197,94,.35); }
+  .block.empty{ color:var(--sub); font-style:normal; }
+  .nav{ display:flex; gap:12px; margin-top:8px; }
+  .nav button{ flex:1; border:none; border-radius:14px; padding:15px 0; font-size:16px; font-weight:800; }
+  .prev{ background:var(--card2); color:var(--sub); border:1px solid var(--line)!important; }
+  .next{ background:var(--accent2); color:#fff; }
+  .next:active,.prev:active{ transform:scale(.98); }
+  .progress{ text-align:center; color:var(--sub); font-size:13px; margin:6px 0 16px; font-weight:700; }
+  .barwrap{ height:6px; background:var(--card); border-radius:99px; overflow:hidden; margin:0 0 16px; }
+  .barfill{ height:100%; background:linear-gradient(90deg,var(--accent),var(--maru)); width:0%; transition:width .25s; }
+  .notice{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; text-align:center;
+    color:var(--sub); font-size:15px; line-height:1.7; }
+  .notice b{ color:var(--fg); }
+  .spin{ display:inline-block; width:16px; height:16px; border:2px solid var(--line); border-top-color:var(--accent);
+    border-radius:50%; animation:sp .8s linear infinite; vertical-align:-3px; }
+  @keyframes sp{ to{ transform:rotate(360deg); } }
+  .hidden{ display:none!important; }
+  .foot{ text-align:center; color:var(--sub); font-size:11px; margin-top:24px; opacity:.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="htop">
+      <h1>🚃 電車モード</h1>
+      <button class="iconbtn" id="refreshBtn">🔄 更新</button>
+    </div>
+    <div class="status">
+      <span class="dot" id="netDot"></span>
+      <span id="statusText">読み込み中…</span>
+    </div>
+  </header>
+
+  <div id="controls" class="hidden">
+    <div class="chips" id="subjChips"></div>
+    <div class="toolrow">
+      <span class="grow" id="countText"></span>
+      <div class="seg" id="orderSeg">
+        <button data-mode="order" class="on">出題順</button>
+        <button data-mode="shuffle">シャッフル</button>
+      </div>
+    </div>
+    <div class="barwrap"><div class="barfill" id="barFill"></div></div>
+    <div class="progress" id="progText"></div>
+    <div id="cardHost"></div>
+  </div>
+
+  <div id="notice" class="notice">
+    <span class="spin"></span> 問題を読み込んでいます…
+  </div>
+
+  <div class="foot">オフラインでも、保存済みの問題は解けます。電波がある時に「🔄更新」で最新化。</div>
+</div>
+
+<script>
+/* ===== 設定 ===== */
+var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
+var LS_PACK = 'shoshi_pack_v1';
+var LS_AT   = 'shoshi_pack_at_v1';
+var LS_PREF = 'shoshi_pref_v1';
+
+/* ===== 状態 ===== */
+var pack = null;          // {dataset,generatedAt,count,items:[]}
+var subject = '全';
+var order = 'order';       // 'order' | 'shuffle'
+var list = [];             // 現在の出題リスト
+var idx = 0;
+var answered = 0, correct = 0;
+
+/* ===== ユーティリティ ===== */
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+function fmtTime(iso){
+  try{ var d=new Date(iso); var p=function(n){return (n<10?'0':'')+n;};
+    return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes()); }catch(e){ return ''; }
+}
+function loadPref(){ try{ var p=JSON.parse(localStorage.getItem(LS_PREF)||'{}'); if(p.subject) subject=p.subject; if(p.order) order=p.order; }catch(e){} }
+function savePref(){ try{ localStorage.setItem(LS_PREF, JSON.stringify({subject:subject, order:order})); }catch(e){} }
+
+/* ===== パック取得（JSONP：CORS回避・GASと相性◎） ===== */
+function fetchPack(done){
+  var cbName='__shoshiPackCb';
+  var s=document.createElement('script');
+  var finished=false;
+  var to=setTimeout(function(){ finish(new Error('timeout')); }, 20000);
+  function cleanup(){ clearTimeout(to); try{ delete window[cbName]; }catch(e){ window[cbName]=null; } if(s.parentNode) s.parentNode.removeChild(s); }
+  function finish(err, data){ if(finished) return; finished=true; cleanup(); done(err, data); }
+  window[cbName]=function(data){ finish(null, data); };
+  s.onerror=function(){ finish(new Error('network')); };
+  s.src=PACK_URL+'?callback='+cbName+'&t='+Date.now();
+  document.head.appendChild(s);
+}
+function savePack(p){
+  try{ localStorage.setItem(LS_PACK, JSON.stringify(p)); localStorage.setItem(LS_AT, new Date().toISOString()); return true; }
+  catch(e){ return false; } // 容量オーバー等
+}
+function readStoredPack(){
+  try{ var raw=localStorage.getItem(LS_PACK); return raw? JSON.parse(raw): null; }catch(e){ return null; }
+}
+
+/* ===== 画面：状態表示 ===== */
+function setStatus(text, online){
+  $('statusText').innerHTML=text;
+  var dot=$('netDot'); dot.className='dot '+(online?'on':'off');
+}
+
+/* ===== 起動 ===== */
+function boot(){
+  loadPref();
+  pack = readStoredPack();
+  if(pack && pack.items && pack.items.length){
+    startWith(pack, true);   // まず保存分ですぐ解ける状態に
+  }
+  // オンラインなら最新取得を試みる
+  if(navigator.onLine){
+    tryRefresh(!pack);       // packが無い初回は「取得中」を前面に
+  } else if(!pack){
+    showFirstRunOffline();
+  }
+}
+
+function showFirstRunOffline(){
+  $('controls').classList.add('hidden');
+  $('notice').classList.remove('hidden');
+  $('notice').innerHTML='📵 いまオフラインです。<br>この端末にはまだ問題が保存されていません。<br><br><b>一度だけ、電波がある場所でこのページを開いてください。</b><br>その後はオフラインでも解けるようになります。';
+  setStatus('オフライン（未取込）', false);
+}
+
+function tryRefresh(foreground){
+  if(foreground){ $('notice').innerHTML='<span class="spin"></span> 問題を取得しています…'; $('notice').classList.remove('hidden'); }
+  setStatus('<span class="spin"></span> 取得中…', true);
+  fetchPack(function(err, data){
+    if(err || !data || !data.items){
+      // 取得失敗：保存分があればそれで続行
+      var at=localStorage.getItem(LS_AT);
+      if(pack){ setStatus('保存済みで学習中（最終取込 '+fmtTime(at)+'）', navigator.onLine); }
+      else { setStatus('取得できませんでした。電波を確認して🔄更新を', navigator.onLine); if(foreground) showFetchError(); }
+      return;
+    }
+    var ok=savePack(data);
+    pack=data;
+    startWith(pack, false);
+    setStatus('最新に更新しました（'+data.count+'問・'+fmtTime(new Date().toISOString())+'）'+(ok?'':'　※保存容量オーバー'), true);
+  });
+}
+
+function showFetchError(){
+  $('controls').classList.add('hidden');
+  $('notice').classList.remove('hidden');
+  $('notice').innerHTML='⚠️ 問題を取得できませんでした。<br>電波を確認して、上の<b>🔄更新</b>を押してみてください。<br><small style="color:var(--sub)">（配信口の初期設定が未完了の可能性もあります）</small>';
+}
+
+/* ===== 出題リスト構築 ===== */
+function subjects(){
+  var seen={}, arr=[];
+  pack.items.forEach(function(q){ if(!seen[q.subject]){ seen[q.subject]=1; arr.push(q.subject); } });
+  return arr;
+}
+function buildList(){
+  list = pack.items.filter(function(q){ return subject==='全' || q.subject===subject; });
+  if(order==='shuffle'){
+    for(var i=list.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=list[i]; list[i]=list[j]; list[j]=t; }
+  }
+  idx=0;
+}
+
+function startWith(p, keepIdx){
+  pack=p;
+  $('notice').classList.add('hidden');
+  $('controls').classList.remove('hidden');
+  renderChips();
+  renderOrderSeg();
+  buildList();
+  render();
+}
+
+function renderChips(){
+  var host=$('subjChips'); host.innerHTML='';
+  var all=['全'].concat(subjects());
+  all.forEach(function(s){
+    var c=el('button','chip'+(s===subject?' on':''), s);
+    c.onclick=function(){ subject=s; savePref(); renderChips(); buildList(); render(); };
+    host.appendChild(c);
+  });
+}
+function renderOrderSeg(){
+  var seg=$('orderSeg');
+  Array.prototype.forEach.call(seg.querySelectorAll('button'), function(b){
+    b.classList.toggle('on', b.getAttribute('data-mode')===order);
+    b.onclick=function(){ order=b.getAttribute('data-mode'); savePref(); renderOrderSeg(); buildList(); render(); };
+  });
+}
+
+/* ===== 1問の描画 ===== */
+function render(){
+  var host=$('cardHost'); host.innerHTML='';
+  $('countText').textContent = subject+'：'+list.length+'問';
+  if(!list.length){
+    host.appendChild(el('div','notice','この科目には問題がありません。'));
+    $('progText').textContent=''; $('barFill').style.width='0%';
+    return;
+  }
+  if(idx>=list.length){
+    var done=el('div','notice'); done.innerHTML='🎉 このセットは最後まで解きました。<br>科目を変えるか、シャッフルでもう一周できます。';
+    host.appendChild(done);
+    $('progText').textContent = list.length+' / '+list.length+'　（正解 '+correct+'/'+answered+'）';
+    $('barFill').style.width='100%';
+    return;
+  }
+  var q=list[idx];
+  $('progText').textContent = (idx+1)+' / '+list.length+'　（正解 '+correct+'/'+answered+'）';
+  $('barFill').style.width = ((idx)/list.length*100)+'%';
+
+  var card=el('div','card');
+  var meta=el('div','meta');
+  meta.appendChild(el('span','qname', q.name+'　'+q.eda));
+  meta.appendChild(el('span','badge', q.subject));
+  card.appendChild(meta);
+  card.appendChild(el('div','bun', q.bun));
+
+  var ansrow=el('div','ansrow');
+  var bm=el('button','ansbtn maru'); bm.innerHTML='◯<span class="sub">正しい</span>';
+  var bb=el('button','ansbtn batsu'); bb.innerHTML='✕<span class="sub">誤り</span>';
+  ansrow.appendChild(bm); ansrow.appendChild(bb);
+  card.appendChild(ansrow);
+
+  var revealed=false;
+  function reveal(my){
+    if(revealed) return; revealed=true;
+    var ans=q.ans; var ok=(my===ans);
+    (my==='○'?bm:bb).classList.add('pick');
+    (ans==='○'?bb:bm).classList.add('dim');
+    bm.onclick=null; bb.onclick=null;
+    answered++; if(ok) correct++;
+
+    var rev=el('div','reveal');
+    var v=el('div','verdict '+(ok?'ok':'ng'), (ok?'正解':'不正解')+'　正解は '+ans);
+    rev.appendChild(v);
+
+    rev.appendChild(el('div','lbl','解説'));
+    if(q.exp && q.exp.trim()){ rev.appendChild(el('div','block', q.exp)); }
+    else { rev.appendChild(el('div','block empty','（この肢の解説はまだありません）')); }
+
+    rev.appendChild(el('div','lbl','根拠の一文'));
+    if(q.reason && q.reason.trim()){ rev.appendChild(el('div','block reason', q.reason)); }
+    else { rev.appendChild(el('div','block empty','（根拠はまだ書かれていません）')); }
+
+    var nav=el('div','nav');
+    var prev=el('button','prev','← 前へ'); prev.onclick=function(){ if(idx>0){ idx--; render(); } };
+    var next=el('button','next', idx>=list.length-1?'おわり →':'次へ →'); next.onclick=function(){ idx++; render(); };
+    if(idx===0) prev.disabled=true, prev.style.opacity=.4;
+    nav.appendChild(prev); nav.appendChild(next);
+    rev.appendChild(nav);
+    card.appendChild(rev);
+    rev.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  bm.onclick=function(){ reveal('○'); };
+  bb.onclick=function(){ reveal('×'); };
+
+  host.appendChild(card);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ===== イベント ===== */
+$('refreshBtn').onclick=function(){ if(!navigator.onLine){ setStatus('オフラインです。電波がある所で更新を', false); return; } tryRefresh(!pack); };
+window.addEventListener('online', function(){ setStatus('オンラインに復帰。🔄更新で最新化できます', true); });
+window.addEventListener('offline', function(){ setStatus('オフライン（保存済みで学習中）', false); });
+
+/* ===== Service Worker 登録 ===== */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+}
+
+boot();
+</script>
+</body>
+</html>
