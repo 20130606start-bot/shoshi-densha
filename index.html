@@ -98,6 +98,7 @@
         <span class="dot" id="netDot"></span>
         <span id="statusText">読み込み中…</span>
       </div>
+      <div class="status" id="syncInfo"></div>
       <div class="chips" id="subjChips"></div>
       <div class="toolrow">
         <span class="grow" id="countText"></span>
@@ -125,9 +126,13 @@
 <script>
 /* ===== 設定 ===== */
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
+var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
+var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
 var LS_PACK = 'shoshi_pack_v1';
 var LS_AT   = 'shoshi_pack_at_v1';
 var LS_PREF = 'shoshi_pref_v1';
+var LS_Q    = 'shoshi_queue_v1';   // 未送信の解答（本体へ同期待ち）
+var LS_DAY  = 'shoshi_day_v1';     // きょう解いた数（端末表示用）
 
 /* ===== 状態 ===== */
 var pack = null;          // {dataset,generatedAt,count,items:[]}
@@ -163,6 +168,70 @@ function fetchPack(done){
 function savePack(p){
   try{ localStorage.setItem(LS_PACK, JSON.stringify(p)); localStorage.setItem(LS_AT, new Date().toISOString()); return true; }
   catch(e){ return false; } // 容量オーバー等
+}
+
+/* ===== 解答の蓄積と本体への同期（Phase 2） =====
+ * 解いた結果を端末(localStorage)に貯め、電波があるとき受信箱GASへ自動送信。
+ * 受信箱は本体の「解答記録」へ追記する＝消灯・降格・継続スタンプに効く。
+ * 送信失敗・オフラインでは貯めたまま（消えない）。重複はバッチIDでサーバー側が弾く。 */
+function readQ(){ try{ return JSON.parse(localStorage.getItem(LS_Q)||'[]'); }catch(e){ return []; } }
+function writeQ(q){ try{ localStorage.setItem(LS_Q, JSON.stringify(q.slice(-3000))); }catch(e){} }
+function todayKey(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function readDay(){
+  try{ var v=JSON.parse(localStorage.getItem(LS_DAY)||'{}'); if(v.d===todayKey()) return v; }catch(e){}
+  return { d: todayKey(), n: 0, ok: 0 };
+}
+function bumpDay(ok){ var v=readDay(); v.n++; if(ok) v.ok++; try{ localStorage.setItem(LS_DAY, JSON.stringify(v)); }catch(e){} }
+function recordLocal(qi, my, ok){
+  var q=readQ();
+  q.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+           t: new Date().toISOString(), name: qi.name, eda: qi.eda, my: my });
+  writeQ(q); bumpDay(ok); updateSyncInfo(); scheduleSync();
+}
+
+/* 汎用JSONP（fetchPackと同方式・コールバック名は連番で衝突回避） */
+var __jsonpSeq=0;
+function jsonp(url, done){
+  var cbName='__shoshiCb'+(++__jsonpSeq);
+  var s=document.createElement('script');
+  var finished=false;
+  var to=setTimeout(function(){ finish(new Error('timeout')); }, 15000);
+  function cleanup(){ clearTimeout(to); try{ delete window[cbName]; }catch(e){ window[cbName]=null; } if(s.parentNode) s.parentNode.removeChild(s); }
+  function finish(err, data){ if(finished) return; finished=true; cleanup(); done(err, data); }
+  window[cbName]=function(data){ finish(null, data); };
+  s.onerror=function(){ finish(new Error('network')); };
+  s.src=url+'&callback='+cbName;
+  document.head.appendChild(s);
+}
+
+var syncTimer=null, syncing=false;
+function scheduleSync(){ if(syncTimer) clearTimeout(syncTimer); syncTimer=setTimeout(syncNow, 4000); }
+function syncNow(){
+  // 開発用ローカル起動(localhost)では誤って偽の解答を本体に送らない（?sync=1 で明示解除）
+  if(/^(localhost|127\.)/.test(location.hostname) && location.search.indexOf('sync=1')<0){ updateSyncInfo('（ローカル・送信オフ）'); return; }
+  if(syncing || !navigator.onLine || !INBOX_URL) { updateSyncInfo(); return; }
+  var q=readQ(); if(!q.length){ updateSyncInfo(); return; }
+  var recs=q.slice(0,40);
+  var batch=recs[0].id+'_'+recs.length; // 再送時も同じID＝サーバーが重複を弾く
+  var payload=recs.map(function(r){ return {t:r.t, name:r.name, eda:r.eda, my:r.my}; });
+  syncing=true; updateSyncInfo('送信中…');
+  jsonp(INBOX_URL+'?token='+INBOX_TOKEN+'&batch='+encodeURIComponent(batch)+'&data='+encodeURIComponent(JSON.stringify(payload)), function(err,res){
+    syncing=false;
+    if(err || !res || !res.ok){ updateSyncInfo(); return; } // 失敗→貯めたまま次の機会に
+    var sent={}; recs.forEach(function(r){ sent[r.id]=1; });
+    writeQ(readQ().filter(function(r){ return !sent[r.id]; }));
+    updateSyncInfo();
+    if(readQ().length) setTimeout(syncNow, 500); // 残りがあれば続けて送る
+  });
+}
+function updateSyncInfo(extra){
+  var elx=$('syncInfo'); if(!elx) return;
+  var day=readDay(), qn=readQ().length;
+  var t='きょう '+day.n+'問（正解 '+day.ok+'）';
+  if(extra) t+='　'+extra;
+  else if(qn>0) t+='　／　未送信 '+qn+'件'+(navigator.onLine?'':'（電波復帰で自動送信）');
+  else if(day.n>0) t+='　／　✅ 本体へ送信済み';
+  elx.textContent=t;
 }
 function readStoredPack(){
   try{ var raw=localStorage.getItem(LS_PACK); return raw? JSON.parse(raw): null; }catch(e){ return null; }
@@ -278,7 +347,8 @@ function render(){
     return;
   }
   if(idx>=list.length){
-    var done=el('div','notice'); done.innerHTML='🎉 このセットは最後まで解きました。<br>上の「'+subject+' ▾」から科目を変えるか、シャッフルでもう一周できます。';
+    var day=readDay(), qn=readQ().length;
+    var done=el('div','notice'); done.innerHTML='🎉 このセットは最後まで解きました。<br>上の「'+subject+' ▾」から科目を変えるか、シャッフルでもう一周できます。<br><br>きょう '+day.n+'問（正解 '+day.ok+'）'+(qn>0?'　未送信 '+qn+'件':'　✅ 本体へ送信済み');
     host.appendChild(done);
     $('progText').textContent = '🚃 '+list.length+' / '+list.length+'　正解 '+correct+'/'+answered;
     $('barFill').style.width='100%';
@@ -309,6 +379,7 @@ function render(){
     (ans==='○'?bb:bm).classList.add('dim');
     bm.onclick=null; bb.onclick=null;
     answered++; if(ok) correct++;
+    recordLocal(q, my, ok);   // 端末に記録→電波があれば本体へ自動同期
 
     var rev=el('div','reveal');
     var v=el('div','verdict '+(ok?'ok':'ng'), (ok?'正解':'不正解')+'　正解は '+ans);
@@ -339,10 +410,10 @@ function render(){
 }
 
 /* ===== イベント ===== */
-$('subjBtn').onclick=function(){ $('panel').classList.toggle('hidden'); };
-$('refreshBtn').onclick=function(){ if(!navigator.onLine){ setStatus('オフラインです。電波がある所で更新を', false); return; } tryRefresh(!pack); };
-window.addEventListener('online', function(){ setStatus('オンラインに復帰。🔄更新で最新化できます', true); });
-window.addEventListener('offline', function(){ setStatus('オフライン（保存済みで学習中）', false); });
+$('subjBtn').onclick=function(){ $('panel').classList.toggle('hidden'); updateSyncInfo(); };
+$('refreshBtn').onclick=function(){ if(!navigator.onLine){ setStatus('オフラインです。電波がある所で更新を', false); return; } tryRefresh(!pack); syncNow(); };
+window.addEventListener('online', function(){ setStatus('オンラインに復帰。未送信の解答を自動送信します', true); syncNow(); });
+window.addEventListener('offline', function(){ setStatus('オフライン（保存済みで学習中）', false); updateSyncInfo(); });
 
 /* ===== Service Worker 登録 ===== */
 if('serviceWorker' in navigator){
@@ -350,6 +421,8 @@ if('serviceWorker' in navigator){
 }
 
 boot();
+updateSyncInfo();
+if(navigator.onLine) setTimeout(syncNow, 2000);  // 起動時に未送信があれば送る
 </script>
 </body>
 </html>

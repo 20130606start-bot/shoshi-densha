@@ -2,7 +2,7 @@
  * アプリ本体（シェル）をキャッシュして、電波が無くても起動できるようにする。
  * 問題データ本体は localStorage に保存するので、ここではシェルだけ面倒を見る。
  * CACHE を上げると全端末で更新が反映される（activate時に旧キャッシュを掃除）。 */
-const CACHE = 'shoshi-offline-v3';
+const CACHE = 'shoshi-offline-v4';
 const SHELL = [
   './',
   './index.html',
