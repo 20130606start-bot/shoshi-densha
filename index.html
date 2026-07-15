@@ -78,6 +78,11 @@
   .barfill{ height:100%; background:linear-gradient(90deg,var(--accent),var(--maru)); width:0%; transition:width .25s; }
   .notice{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; text-align:center;
     color:var(--sub); font-size:15px; line-height:1.7; }
+  .wrow{ display:block; width:100%; text-align:left; background:var(--card2); color:var(--fg);
+    border:1px solid rgba(239,68,68,.35); border-radius:12px; padding:10px 12px; margin-top:8px;
+    font-size:16px; line-height:1.6; }
+  .wrow:active{ transform:scale(.98); }
+  .wrow .wname{ display:block; font-size:13px; font-weight:800; color:var(--sub); }
   .notice b{ color:var(--fg); }
   .spin{ display:inline-block; width:16px; height:16px; border:2px solid var(--line); border-top-color:var(--accent);
     border-radius:50%; animation:sp .8s linear infinite; vertical-align:-3px; }
@@ -106,6 +111,7 @@
           <button data-mode="order" class="on">出題順</button>
           <button data-mode="shuffle">シャッフル</button>
         </div>
+        <button class="iconbtn" id="resultBtn">📊 リザルト</button>
         <button class="iconbtn" id="refreshBtn">🔄 更新</button>
       </div>
     </div>
@@ -133,6 +139,7 @@ var LS_AT   = 'shoshi_pack_at_v1';
 var LS_PREF = 'shoshi_pref_v1';
 var LS_Q    = 'shoshi_queue_v1';   // 未送信の解答（本体へ同期待ち）
 var LS_DAY  = 'shoshi_day_v1';     // きょう解いた数（端末表示用）
+var LS_SESS = 'shoshi_sess_v1';    // きょうの解答ログ（リザルト・間違い復習用）
 
 /* ===== 状態 ===== */
 var pack = null;          // {dataset,generatedAt,count,items:[]}
@@ -186,7 +193,34 @@ function recordLocal(qi, my, ok){
   var q=readQ();
   q.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,7),
            t: new Date().toISOString(), name: qi.name, eda: qi.eda, my: my });
-  writeQ(q); bumpDay(ok); updateSyncInfo(); scheduleSync();
+  writeQ(q); bumpDay(ok); pushSess(qi, my, ok); updateSyncInfo(); scheduleSync();
+}
+
+/* ===== きょうのリザルト（セッションログ・端末内だけで完結） ===== */
+function readSess(){
+  try{ var v=JSON.parse(localStorage.getItem(LS_SESS)||'{}'); if(v.d===todayKey() && Array.isArray(v.log)) return v; }catch(e){}
+  return { d: todayKey(), log: [] };
+}
+function pushSess(qi, my, ok){
+  var v=readSess();
+  v.log.push({ name: qi.name, eda: qi.eda, my: my, ok: !!ok });
+  if(v.log.length>500) v.log=v.log.slice(-500);
+  try{ localStorage.setItem(LS_SESS, JSON.stringify(v)); }catch(e){}
+}
+/** きょう間違えたままの肢（同じ肢を解き直して正解したら消える）。出会った順。 */
+function wrongsNow(){
+  var latest={}, order=[];
+  readSess().log.forEach(function(r){
+    var k=r.name+'|'+r.eda;
+    if(!(k in latest)) order.push(k);
+    latest[k]=r.ok;
+  });
+  return order.filter(function(k){ return !latest[k]; });
+}
+function packIndex_(){
+  var m={};
+  if(pack && pack.items) pack.items.forEach(function(q){ m[q.name+'|'+q.eda]=q; });
+  return m;
 }
 
 /* 汎用JSONP（fetchPackと同方式・コールバック名は連番で衝突回避） */
@@ -291,12 +325,14 @@ function showFetchError(){
 }
 
 /* ===== 出題リスト構築 ===== */
+var reviewMode=false;   // true=きょうの間違いだけを解き直すモード
 function subjects(){
   var seen={}, arr=[];
   pack.items.forEach(function(q){ if(!seen[q.subject]){ seen[q.subject]=1; arr.push(q.subject); } });
   return arr;
 }
 function buildList(){
+  reviewMode=false;
   list = pack.items.filter(function(q){ return subject==='全' || q.subject===subject; });
   if(order==='shuffle'){
     for(var i=list.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=list[i]; list[i]=list[j]; list[j]=t; }
@@ -340,7 +376,7 @@ function renderOrderSeg(){
 /* ===== 1問の描画 ===== */
 function render(){
   var host=$('cardHost'); host.innerHTML='';
-  $('countText').textContent = subject+'：'+list.length+'問';
+  $('countText').textContent = reviewMode? ('間違い復習：'+list.length+'問') : (subject+'：'+list.length+'問');
   if(!list.length){
     host.appendChild(el('div','notice','この科目には問題がありません。'));
     $('progText').textContent='🚃 '+subject+'：0問'; $('barFill').style.width='0%';
@@ -348,8 +384,14 @@ function render(){
   }
   if(idx>=list.length){
     var day=readDay(), qn=readQ().length;
-    var done=el('div','notice'); done.innerHTML='🎉 このセットは最後まで解きました。<br>上の「'+subject+' ▾」から科目を変えるか、シャッフルでもう一周できます。<br><br>きょう '+day.n+'問（正解 '+day.ok+'）'+(qn>0?'　未送信 '+qn+'件':'　✅ 本体へ送信済み');
+    var done=el('div','notice');
+    done.innerHTML=(reviewMode? '🎉 きょうの間違い分をやり切りました。':'🎉 このセットは最後まで解きました。<br>上の「'+subject+' ▾」から科目を変えるか、シャッフルでもう一周できます。')
+      +'<br><br>きょう '+day.n+'問（正解 '+day.ok+'）'+(qn>0?'　未送信 '+qn+'件':'　✅ 本体へ送信済み');
     host.appendChild(done);
+    var rbtn=el('button','next','📊 きょうのリザルトを見る');
+    rbtn.style.cssText='width:100%;margin-top:14px;padding:14px 0;border:none;border-radius:14px;font-size:16px;font-weight:800;';
+    rbtn.onclick=showResult;
+    host.appendChild(rbtn);
     $('progText').textContent = '🚃 '+list.length+' / '+list.length+'　正解 '+correct+'/'+answered;
     $('barFill').style.width='100%';
     return;
@@ -409,8 +451,66 @@ function render(){
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
+/* ===== きょうのリザルト画面 ===== */
+function showResult(){
+  closePanel();
+  var host=$('cardHost'); host.innerHTML='';
+  var day=readDay(), qn=readQ().length, wrongs=wrongsNow();
+  var rate = day.n? Math.round(day.ok/day.n*100) : 0;
+
+  var sum=el('div','card');
+  sum.appendChild(el('div','lbl','📊 きょうのリザルト'));
+  var big=el('div'); big.style.cssText='font-size:26px;font-weight:900;margin:4px 0 2px;';
+  big.textContent = day.n+'問　正解 '+day.ok+'（'+rate+'%）';
+  sum.appendChild(big);
+  var sub=el('div'); sub.style.cssText='font-size:14px;color:var(--sub);';
+  sub.textContent = qn>0? '未送信 '+qn+'件（電波が入れば自動で本体へ）' : (day.n>0? '✅ 本体へ送信済み' : 'きょうはまだ解いていません');
+  sum.appendChild(sub);
+  host.appendChild(sum);
+
+  var wc=el('div','card');
+  wc.appendChild(el('div','lbl','❌ 間違えたままの肢（'+wrongs.length+'）'));
+  if(!wrongs.length){
+    var okmsg=el('div'); okmsg.style.cssText='font-size:17px;padding:6px 0;';
+    okmsg.textContent = day.n? '全部解き直し済み（または全問正解）です 🎉' : '—';
+    wc.appendChild(okmsg);
+  } else {
+    var pidx=packIndex_();
+    wrongs.forEach(function(k, i){
+      var q=pidx[k]; if(!q) return;
+      var row=el('button','wrow');
+      row.innerHTML='<span class="wname">'+q.name+'　'+q.eda+'</span>'+String(q.bun).slice(0,42)+'…';
+      row.onclick=function(){ startWrongRound(i); };
+      wc.appendChild(row);
+    });
+    var again=el('button','next','🔁 間違いだけもう一周（'+wrongs.length+'問）');
+    again.style.cssText='width:100%;margin-top:12px;padding:14px 0;border:none;border-radius:14px;font-size:16px;font-weight:800;';
+    again.onclick=function(){ startWrongRound(0); };
+    wc.appendChild(again);
+  }
+  host.appendChild(wc);
+
+  var back=el('button','prev','← 問題にもどる');
+  back.style.cssText='width:100%;padding:14px 0;border-radius:14px;font-size:16px;font-weight:800;';
+  back.onclick=function(){ render(); };
+  host.appendChild(back);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/** きょうの間違いだけを出題リストにして解き直す（startIdx番目から） */
+function startWrongRound(startIdx){
+  var pidx=packIndex_();
+  var items=wrongsNow().map(function(k){ return pidx[k]; }).filter(function(q){ return !!q; });
+  if(!items.length){ showResult(); return; }
+  reviewMode=true;
+  list=items;
+  idx=Math.min(startIdx||0, items.length-1);
+  render();
+}
+
 /* ===== イベント ===== */
 $('subjBtn').onclick=function(){ $('panel').classList.toggle('hidden'); updateSyncInfo(); };
+$('resultBtn').onclick=function(){ if(pack) showResult(); };
 $('refreshBtn').onclick=function(){ if(!navigator.onLine){ setStatus('オフラインです。電波がある所で更新を', false); return; } tryRefresh(!pack); syncNow(); };
 window.addEventListener('online', function(){ setStatus('オンラインに復帰。未送信の解答を自動送信します', true); syncNow(); });
 window.addEventListener('offline', function(){ setStatus('オフライン（保存済みで学習中）', false); updateSyncInfo(); });
