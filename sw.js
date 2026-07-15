@@ -2,7 +2,7 @@
  * アプリ本体（シェル）をキャッシュして、電波が無くても起動できるようにする。
  * 問題データ本体は localStorage に保存するので、ここではシェルだけ面倒を見る。
  * CACHE を上げると全端末で更新が反映される（activate時に旧キャッシュを掃除）。 */
-const CACHE = 'shoshi-offline-v6';
+const CACHE = 'shoshi-offline-v7';
 const SHELL = [
   './',
   './index.html',
@@ -32,6 +32,8 @@ self.addEventListener('fetch', function (e) {
   const url = new URL(req.url);
   // 同一オリジン（＝GitHub Pages上のシェル）だけ面倒を見る。GASのパック取得(別オリジン)は素通し。
   if (url.origin !== self.location.origin) return;
+  // /shorts/（登記簿ショート動画）はキャッシュせず常にネットから＝更新が即反映される
+  if (url.pathname.indexOf('/shorts/') >= 0) return;
   e.respondWith(
     caches.match(req).then(function (hit) {
       if (hit) return hit;
