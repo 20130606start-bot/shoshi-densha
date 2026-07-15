@@ -21,13 +21,14 @@ body{
 .bar{ flex:1; height:3px; background:rgba(255,255,255,.22); border-radius:99px; overflow:hidden; }
 .bar i{ display:block; height:100%; width:0%; background:#e3b341; }
 /* シーン */
-.scene{ position:absolute; inset:0; padding:calc(env(safe-area-inset-top) + 30px) 20px 40px;
+/* 左右パディングはShortsプレイヤーの拡大表示で約9%ずつ切れるためのセーフエリア込み */
+.scene{ position:absolute; inset:0; padding:calc(env(safe-area-inset-top) + 44px) 48px 64px;
   display:flex; flex-direction:column; justify-content:center; gap:14px;
   opacity:0; transform:translateY(12px); transition:opacity .45s, transform .45s;
   pointer-events:none; }
 .scene.on{ opacity:1; transform:none; pointer-events:auto; }
 .eyebrow{ font-size:15px; font-weight:800; color:#e3b341; letter-spacing:.12em; }
-h1{ font-size:34px; line-height:1.4; font-weight:900; text-wrap:balance; }
+h1{ font-size:31px; line-height:1.4; font-weight:900; text-wrap:balance; }
 h2{ font-size:25px; line-height:1.45; font-weight:900; }
 .big{ font-size:52px; font-weight:900; color:#e3b341; line-height:1.2; }
 .cap{ font-size:17px; line-height:1.8; color:#c9d5e3; }
