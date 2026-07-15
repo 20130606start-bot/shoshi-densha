@@ -99,6 +99,10 @@
       <button class="subjbtn" id="subjBtn">メニュー ▾</button>
     </div>
     <div class="panel hidden" id="panel">
+      <div class="seg" id="setSeg" style="margin-bottom:10px;">
+        <button data-set="r7" class="on">令和7</button>
+        <button data-set="r6">令和6</button>
+      </div>
       <div class="status">
         <span class="dot" id="netDot"></span>
         <span id="statusText">読み込み中…</span>
@@ -142,12 +146,16 @@ var LS_DAY  = 'shoshi_day_v1';     // きょう解いた数（端末表示用）
 var LS_SESS = 'shoshi_sess_v1';    // きょうの解答ログ（リザルト・間違い復習用）
 
 /* ===== 状態 ===== */
-var pack = null;          // {dataset,generatedAt,count,items:[]}
+var SETS_UI = { r7:{label:'令和7', short:'令7'}, r6:{label:'令和6', short:'令6'} };
+var curSet = 'r7';         // 選択中セット（端末に保存）
+var pack = null;          // {dataset,set,generatedAt,count,items:[]}
 var subject = '全';
 var order = 'order';       // 'order' | 'shuffle'
 var list = [];             // 現在の出題リスト
 var idx = 0;
 var answered = 0, correct = 0;
+function packKey(){ return curSet==='r7' ? LS_PACK : 'shoshi_pack_'+curSet+'_v1'; }  // r7は旧キー＝既存端末の保存分をそのまま使う
+function atKey(){ return curSet==='r7' ? LS_AT : 'shoshi_pack_at_'+curSet+'_v1'; }
 
 /* ===== ユーティリティ ===== */
 function $(id){ return document.getElementById(id); }
@@ -156,8 +164,8 @@ function fmtTime(iso){
   try{ var d=new Date(iso); var p=function(n){return (n<10?'0':'')+n;};
     return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes()); }catch(e){ return ''; }
 }
-function loadPref(){ try{ var p=JSON.parse(localStorage.getItem(LS_PREF)||'{}'); if(p.subject) subject=p.subject; if(p.order) order=p.order; }catch(e){} }
-function savePref(){ try{ localStorage.setItem(LS_PREF, JSON.stringify({subject:subject, order:order})); }catch(e){} }
+function loadPref(){ try{ var p=JSON.parse(localStorage.getItem(LS_PREF)||'{}'); if(p.subject) subject=p.subject; if(p.order) order=p.order; if(p.set && SETS_UI[p.set]) curSet=p.set; }catch(e){} }
+function savePref(){ try{ localStorage.setItem(LS_PREF, JSON.stringify({subject:subject, order:order, set:curSet})); }catch(e){} }
 
 /* ===== パック取得（JSONP：CORS回避・GASと相性◎） ===== */
 function fetchPack(done){
@@ -169,11 +177,11 @@ function fetchPack(done){
   function finish(err, data){ if(finished) return; finished=true; cleanup(); done(err, data); }
   window[cbName]=function(data){ finish(null, data); };
   s.onerror=function(){ finish(new Error('network')); };
-  s.src=PACK_URL+'?callback='+cbName+'&t='+Date.now();
+  s.src=PACK_URL+'?set='+curSet+'&callback='+cbName+'&t='+Date.now();
   document.head.appendChild(s);
 }
 function savePack(p){
-  try{ localStorage.setItem(LS_PACK, JSON.stringify(p)); localStorage.setItem(LS_AT, new Date().toISOString()); return true; }
+  try{ localStorage.setItem(packKey(), JSON.stringify(p)); localStorage.setItem(atKey(), new Date().toISOString()); return true; }
   catch(e){ return false; } // 容量オーバー等
 }
 
@@ -192,7 +200,7 @@ function bumpDay(ok){ var v=readDay(); v.n++; if(ok) v.ok++; try{ localStorage.s
 function recordLocal(qi, my, ok){
   var q=readQ();
   q.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,7),
-           t: new Date().toISOString(), name: qi.name, eda: qi.eda, my: my });
+           t: new Date().toISOString(), set: curSet, name: qi.name, eda: qi.eda, my: my });
   writeQ(q); bumpDay(ok); pushSess(qi, my, ok); updateSyncInfo(); scheduleSync();
 }
 
@@ -203,14 +211,15 @@ function readSess(){
 }
 function pushSess(qi, my, ok){
   var v=readSess();
-  v.log.push({ name: qi.name, eda: qi.eda, my: my, ok: !!ok });
+  v.log.push({ set: curSet, name: qi.name, eda: qi.eda, my: my, ok: !!ok });
   if(v.log.length>500) v.log=v.log.slice(-500);
   try{ localStorage.setItem(LS_SESS, JSON.stringify(v)); }catch(e){}
 }
-/** きょう間違えたままの肢（同じ肢を解き直して正解したら消える）。出会った順。 */
+/** きょう間違えたままの肢（選択中セット分。同じ肢を解き直して正解したら消える）。出会った順。 */
 function wrongsNow(){
   var latest={}, order=[];
   readSess().log.forEach(function(r){
+    if((r.set||'r7')!==curSet) return;
     var k=r.name+'|'+r.eda;
     if(!(k in latest)) order.push(k);
     latest[k]=r.ok;
@@ -268,7 +277,7 @@ function updateSyncInfo(extra){
   elx.textContent=t;
 }
 function readStoredPack(){
-  try{ var raw=localStorage.getItem(LS_PACK); return raw? JSON.parse(raw): null; }catch(e){ return null; }
+  try{ var raw=localStorage.getItem(packKey()); return raw? JSON.parse(raw): null; }catch(e){ return null; }
 }
 
 /* ===== 画面：状態表示 ===== */
@@ -305,7 +314,7 @@ function tryRefresh(foreground){
   fetchPack(function(err, data){
     if(err || !data || !data.items){
       // 取得失敗：保存分があればそれで続行
-      var at=localStorage.getItem(LS_AT);
+      var at=localStorage.getItem(atKey());
       if(pack){ setStatus('保存済みで学習中（最終取込 '+fmtTime(at)+'）', navigator.onLine); }
       else { setStatus('取得できませんでした。電波を確認して🔄更新を', navigator.onLine); if(foreground) showFetchError(); }
       return;
@@ -356,6 +365,32 @@ function openPanel(){ $('panel').classList.remove('hidden'); }
 function closePanel(){ $('panel').classList.add('hidden'); }
 function setSubjBtn(){ $('subjBtn').textContent = (pack? subject: 'メニュー')+' ▾'; }
 
+/* ===== セット（年度）切替 ===== */
+function renderSetSeg(){
+  Array.prototype.forEach.call($('setSeg').querySelectorAll('button'), function(b){
+    b.classList.toggle('on', b.getAttribute('data-set')===curSet);
+    b.onclick=function(){ switchSet(b.getAttribute('data-set')); };
+  });
+}
+function switchSet(k){
+  if(!SETS_UI[k] || k===curSet) return;
+  curSet=k; savePref(); renderSetSeg();
+  pack=readStoredPack();
+  if(pack && pack.items && pack.items.length){
+    if(subject!=='全' && !pack.items.some(function(q){ return q.subject===subject; })){ subject='全'; savePref(); }
+    startWith(pack, false);
+    setStatus(SETS_UI[k].label+'に切替（保存済み '+pack.items.length+'問）', navigator.onLine);
+    closePanel();
+  } else if(navigator.onLine){
+    tryRefresh(true);   // この端末に未保存→その場で取得
+  } else {
+    $('controls').classList.add('hidden');
+    $('notice').classList.remove('hidden');
+    $('notice').innerHTML='📵 '+SETS_UI[k].label+'は、まだこの端末に保存されていません。<br><b>電波のある場所で一度開いて取り込んでください。</b>';
+    setStatus(SETS_UI[k].label+'（未取込）', false);
+  }
+}
+
 function renderChips(){
   var host=$('subjChips'); host.innerHTML='';
   var all=['全'].concat(subjects());
@@ -379,7 +414,7 @@ function render(){
   $('countText').textContent = reviewMode? ('間違い復習：'+list.length+'問') : (subject+'：'+list.length+'問');
   if(!list.length){
     host.appendChild(el('div','notice','この科目には問題がありません。'));
-    $('progText').textContent='🚃 '+subject+'：0問'; $('barFill').style.width='0%';
+    $('progText').textContent='🚃'+SETS_UI[curSet].short+' '+subject+'：0問'; $('barFill').style.width='0%';
     return;
   }
   if(idx>=list.length){
@@ -392,12 +427,12 @@ function render(){
     rbtn.style.cssText='width:100%;margin-top:14px;padding:14px 0;border:none;border-radius:14px;font-size:16px;font-weight:800;';
     rbtn.onclick=showResult;
     host.appendChild(rbtn);
-    $('progText').textContent = '🚃 '+list.length+' / '+list.length+'　正解 '+correct+'/'+answered;
+    $('progText').textContent = '🚃'+SETS_UI[curSet].short+' '+list.length+' / '+list.length+'　正解 '+correct+'/'+answered;
     $('barFill').style.width='100%';
     return;
   }
   var q=list[idx];
-  $('progText').textContent = '🚃 '+(idx+1)+' / '+list.length+'　正解 '+correct+'/'+answered;
+  $('progText').textContent = '🚃'+SETS_UI[curSet].short+' '+(idx+1)+' / '+list.length+'　正解 '+correct+'/'+answered;
   $('barFill').style.width = ((idx)/list.length*100)+'%';
 
   var card=el('div','card');
@@ -521,6 +556,7 @@ if('serviceWorker' in navigator){
 }
 
 boot();
+renderSetSeg();
 updateSyncInfo();
 if(navigator.onLine) setTimeout(syncNow, 2000);  // 起動時に未送信があれば送る
 </script>
