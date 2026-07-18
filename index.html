@@ -255,9 +255,9 @@ function syncNow(){
   if(syncing || !navigator.onLine || !INBOX_URL) { updateSyncInfo(); return; }
   var q=readQ(); if(!q.length){ updateSyncInfo(); return; }
   var recs=q.slice(0,40);
-  var batch=recs[0].id+'_'+recs.length; // 再送時も同じID＝サーバーが重複を弾く
-  // set（年度セット）は必ず載せる：落とすと受信箱が既定のr7として記録してしまう
-  var payload=recs.map(function(r){ return {t:r.t, set:(r.set||'r7'), name:r.name, eda:r.eda, my:r.my}; });
+  var batch=recs[0].id+'_'+recs.length; // 受信ログの見出し用。重複排除はサーバーがレコードのidで行う
+  // キューの中身はそのまま全部送る。id（重複排除の鍵）と set（年度）を落とすと壊れる
+  var payload=recs.map(function(r){ return {id:r.id, t:r.t, set:(r.set||'r7'), name:r.name, eda:r.eda, my:r.my}; });
   syncing=true; updateSyncInfo('送信中…');
   jsonp(INBOX_URL+'?token='+INBOX_TOKEN+'&batch='+encodeURIComponent(batch)+'&data='+encodeURIComponent(JSON.stringify(payload)), function(err,res){
     syncing=false;
