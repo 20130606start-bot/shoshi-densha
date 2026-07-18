@@ -256,7 +256,8 @@ function syncNow(){
   var q=readQ(); if(!q.length){ updateSyncInfo(); return; }
   var recs=q.slice(0,40);
   var batch=recs[0].id+'_'+recs.length; // 再送時も同じID＝サーバーが重複を弾く
-  var payload=recs.map(function(r){ return {t:r.t, name:r.name, eda:r.eda, my:r.my}; });
+  // set（年度セット）は必ず載せる：落とすと受信箱が既定のr7として記録してしまう
+  var payload=recs.map(function(r){ return {t:r.t, set:(r.set||'r7'), name:r.name, eda:r.eda, my:r.my}; });
   syncing=true; updateSyncInfo('送信中…');
   jsonp(INBOX_URL+'?token='+INBOX_TOKEN+'&batch='+encodeURIComponent(batch)+'&data='+encodeURIComponent(JSON.stringify(payload)), function(err,res){
     syncing=false;
