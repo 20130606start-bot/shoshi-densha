@@ -50,6 +50,13 @@
   .meta{ display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
   .qname{ font-size:12px; color:var(--sub); font-weight:700; }
   .badge{ font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:var(--card2); color:var(--sub); }
+  /* 前提＝肢の上に小さく出す設問文（本体アプリ v137 の .zentei と同じ役目）。
+     本文(.bun)より一段小さく・薄くする。ここが本文と同じ大きさだと、どちらが問いか分からなくなる。
+     電車は片手・揺れる場所なので、本体(13px)より大きい18pxにしてある。 */
+  .zentei{ font-size:18px; line-height:1.7; color:var(--sub); background:var(--card2);
+    border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:10px; padding:10px 12px; margin-bottom:12px; white-space:pre-wrap; word-break:break-word; }
+  .zentei b{ display:block; font-size:12px; font-weight:800; color:var(--fg); margin-bottom:4px; letter-spacing:.05em; }
   .bun{ font-size:34px; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
   .ansrow{ display:flex; gap:12px; margin-top:18px; }
   .ansbtn{ flex:1; border:2px solid var(--line); background:var(--card2); color:var(--fg);
@@ -160,7 +167,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v12';
+var BUILD = 'v13';
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -567,6 +574,16 @@ function render(){
   meta.appendChild(el('span','qname', q.name+'　'+q.eda));
   meta.appendChild(el('span','badge', q.subject));
   card.appendChild(meta);
+  /* 前提（2026-08-19）＝肢だけでは「Ｂが誰か」が分からない肢を読むための設問文。
+     本体アプリは v137 から出しているのに、**電車モードは出していなかった**
+     （パックには 8/18 から載っていたのに、描く側を足し忘れていた＝社長「前提情報ないのつらい」）。
+     置き場・見た目は本体の `.zentei` と同じ＝肢の**上に小さく**。無ければ何も出さない。 */
+  if(q.zentei && String(q.zentei).trim()){
+    var zbox=el('div','zentei');
+    zbox.appendChild(el('b',null,'前提'));
+    zbox.appendChild(document.createTextNode(String(q.zentei).trim()));
+    card.appendChild(zbox);
+  }
   card.appendChild(el('div','bun', q.bun));
 
   var ansrow=el('div','ansrow');
