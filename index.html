@@ -131,6 +131,13 @@
           <button data-mode="order" class="on">出題順</button>
           <button data-mode="shuffle">シャッフル</button>
         </div>
+        <!-- 2026-08-19 社長の依頼＝「◯が2回付いていない肢を連続でやりたい」。
+             並び方（上）とは別の軸なので、別のセグにする。 -->
+        <div class="seg" id="onlySeg">
+          <button data-only="all" class="on">ぜんぶ</button>
+          <button data-only="yet">◯2回未満</button>
+          <button data-only="reason">根拠だけ</button>
+        </div>
         <button class="iconbtn" id="resultBtn">📊 リザルト</button>
         <button class="iconbtn" id="refreshBtn">🔄 更新</button>
       </div>
@@ -153,7 +160,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v11';
+var BUILD = 'v12';
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -171,6 +178,14 @@ var curSet = 'r7';         // 選択中セット（端末に保存）
 var pack = null;          // {dataset,set,generatedAt,count,items:[]}
 var subject = '全';
 var order = 'order';       // 'order' | 'shuffle'
+/* 出す肢の絞り込み（2026-08-19）
+   'all'    … ぜんぶ（これまでどおり）
+   'yet'    … **◯が2回付いていない肢だけ**（社長の依頼）
+              ＝ 消灯でもなく、「あと一歩（根拠だけ足りない）」でもない肢。
+              本体アプリの「科目別で解くモード」と同じ集合になる（getSubjectRemaining）
+   'reason' … ◯は2回付いていて**根拠だけ足りない**肢（家で書くもの／電車では読んで思い出す用）
+   判定に使う印は、パックの st（状態）と act（あと一歩の内訳）。 */
+var only = 'all';
 var list = [];             // 現在の出題リスト
 var idx = 0;
 var answered = 0, correct = 0;
@@ -184,8 +199,8 @@ function fmtTime(iso){
   try{ var d=new Date(iso); var p=function(n){return (n<10?'0':'')+n;};
     return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes()); }catch(e){ return ''; }
 }
-function loadPref(){ try{ var p=JSON.parse(localStorage.getItem(LS_PREF)||'{}'); if(p.subject) subject=p.subject; if(p.order) order=p.order; if(p.set && SETS_UI[p.set]) curSet=p.set; }catch(e){} }
-function savePref(){ try{ localStorage.setItem(LS_PREF, JSON.stringify({subject:subject, order:order, set:curSet})); }catch(e){} }
+function loadPref(){ try{ var p=JSON.parse(localStorage.getItem(LS_PREF)||'{}'); if(p.subject) subject=p.subject; if(p.order) order=p.order; if(p.only) only=p.only; if(p.set && SETS_UI[p.set]) curSet=p.set; }catch(e){} }
+function savePref(){ try{ localStorage.setItem(LS_PREF, JSON.stringify({subject:subject, order:order, only:only, set:curSet})); }catch(e){} }
 
 /* ===== パック取得（JSONP：CORS回避・GASと相性◎） ===== */
 function fetchPack(done){
@@ -418,9 +433,26 @@ function subjects(){
   pack.items.forEach(function(q){ if(!seen[q.subject]){ seen[q.subject]=1; arr.push(q.subject); } });
   return arr;
 }
+/** ◯が2回付いているか（消灯／根拠だけ足りない）。**印の無い古いパックでは常に false**＝全部出す */
+function twoMaru_(q){ return q.st==='消灯' || (q.st==='あと一歩' && q.act==='根拠'); }
+/** きょう、この端末で正解した肢。パックの印は🔄更新まで変わらないので、
+    これを外さないと**さっき正解した肢がすぐまた出る**（2026-08-19）。 */
+function okToday_(){
+  var m={};
+  readSess().log.forEach(function(r){ if((r.set||'r7')===curSet && r.ok) m[r.name+'|'+r.eda]=1; });
+  return m;
+}
 function buildList(){
   reviewMode=false;
-  list = pack.items.filter(function(q){ return subject==='全' || q.subject===subject; });
+  var hasMark = !!(pack.items.length && pack.items[0].st);   // 古いパックには st が無い
+  var okd = (only==='yet') ? okToday_() : {};
+  list = pack.items.filter(function(q){
+    if(!(subject==='全' || q.subject===subject)) return false;
+    if(only==='all' || !hasMark) return true;
+    if(only==='yet')    return !twoMaru_(q) && !okd[q.name+'|'+q.eda];
+    if(only==='reason') return q.st==='あと一歩' && q.act==='根拠';
+    return true;
+  });
   if(order==='shuffle'){
     for(var i=list.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=list[i]; list[i]=list[j]; list[j]=t; }
   }
@@ -433,6 +465,7 @@ function startWith(p, keepIdx){
   $('controls').classList.remove('hidden');
   renderChips();
   renderOrderSeg();
+  renderOnlySeg();
   setSubjBtn();
   buildList();
   render();
@@ -485,13 +518,29 @@ function renderOrderSeg(){
     b.onclick=function(){ order=b.getAttribute('data-mode'); savePref(); renderOrderSeg(); buildList(); render(); closePanel(); };
   });
 }
+function renderOnlySeg(){
+  var seg=$('onlySeg');
+  if(!seg) return;
+  /* 印の無い古いパックのときは絞り込みを出さない（押しても何も起きないボタンを見せない）。
+     🔄更新すれば印つきのパックが来る。 */
+  var hasMark = !!(pack && pack.items && pack.items.length && pack.items[0].st);
+  seg.style.display = hasMark ? '' : 'none';
+  Array.prototype.forEach.call(seg.querySelectorAll('button'), function(b){
+    b.classList.toggle('on', b.getAttribute('data-only')===only);
+    b.onclick=function(){ only=b.getAttribute('data-only'); savePref(); renderOnlySeg(); buildList(); render(); closePanel(); };
+  });
+}
 
 /* ===== 1問の描画 ===== */
 function render(){
   var host=$('cardHost'); host.innerHTML='';
-  $('countText').textContent = reviewMode? ('間違い復習：'+list.length+'問') : (subject+'：'+list.length+'問');
+  $('countText').textContent = reviewMode? ('間違い復習：'+list.length+'問')
+    : (subject+(only==='yet'?'・◯2回未満':only==='reason'?'・根拠だけ':'')+'：'+list.length+'問');
   if(!list.length){
-    host.appendChild(el('div','notice','この科目には問題がありません。'));
+    host.appendChild(el('div','notice',
+      only==='yet'    ? 'この科目は、◯が2回付いていない肢がありません。（残っているのは根拠だけ）' :
+      only==='reason' ? 'この科目に「根拠だけ足りない肢」はありません。' :
+                        'この科目には問題がありません。'));
     $('progText').textContent='🚃'+SETS_UI[curSet].short+' '+subject+'：0問'; $('barFill').style.width='0%';
     return;
   }
