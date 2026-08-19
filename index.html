@@ -167,7 +167,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v13';
+var BUILD = 'v14';
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -386,12 +386,31 @@ function setStatus(text, online){
   var dot=$('netDot'); dot.className='dot '+(online?'on':'off');
 }
 
+/* ===== 古いデータの見分け（2026-08-19夜）=====
+   社長「今日やったが、令和6 肢の問題 **前提なし** 困ったよ」。
+   原因は前提が無いことではなく、**端末に入っているパックが古い**こと。
+   前提は8/18から、状態の印(st)は8/19から配っている。**電車の中はオフラインなので取り直せない。**
+   → ①古いと分かったら、オンラインなら黙って取り直す ②オフラインなら「なぜ出ないか」を画面に出す
+   （黙って前提が出ないと、社長には壊れているのか未実装なのか区別できない）。 */
+function packIsOld_(p){
+  if(!p || !p.items || !p.items.length) return false;
+  return !p.items[0].st;      // st が無い＝8/19より前に取り込んだパック
+}
+function warnOldPack_(){
+  var el2=$('syncInfo');
+  if(!el2) return;
+  el2.innerHTML = navigator.onLine
+    ? '⏳ データが古いので取り直しています…'
+    : '⚠ このデータは古い版です（<b>前提が入っていません</b>）。電波のある所で開けば自動で入ります。';
+}
+
 /* ===== 起動 ===== */
 function boot(){
   loadPref();
   pack = readStoredPack();
   if(pack && pack.items && pack.items.length){
     startWith(pack, true);   // まず保存分ですぐ解ける状態に
+    if(packIsOld_(pack)) warnOldPack_();
   }
   // オンラインなら最新取得を試みる
   if(navigator.onLine){
@@ -422,6 +441,7 @@ function tryRefresh(foreground){
     var ok=savePack(data);
     pack=data;
     startWith(pack, false);
+    updateSyncInfo();   // 「古い版です」の断りを消す（もう新しいのが入った）
     setStatus('最新に更新しました（'+data.count+'問・'+fmtTime(new Date().toISOString())+'）'+(ok?'':'　※保存容量オーバー'), true);
   });
 }
@@ -499,6 +519,12 @@ function switchSet(k){
     startWith(pack, false);
     setStatus(SETS_UI[k].label+'に切替（保存済み '+pack.items.length+'問）', navigator.onLine);
     closePanel();
+    /* ⚠ ここが 2026-08-19 に見つかった穴：
+       **切替では取り直していなかった**。起動時に取り直すのは「そのとき選んでいた年度」だけなので、
+       あとから令和6へ切り替えると、**何日前のパックでもそのまま使い続ける**（前提も状態の印も入らない）。
+       → 保存分ですぐ解ける状態にしたうえで、オンラインなら**裏で取り直す**。 */
+    if(navigator.onLine){ if(packIsOld_(pack)) warnOldPack_(); tryRefresh(false); }
+    else if(packIsOld_(pack)){ warnOldPack_(); }
   } else if(navigator.onLine){
     tryRefresh(true);   // この端末に未保存→その場で取得
   } else {
