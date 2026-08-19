@@ -178,7 +178,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v15';
+var BUILD = 'v16';
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -552,22 +552,41 @@ function subjects(){
 }
 /** ◯が2回付いているか（消灯／根拠だけ足りない）。**印の無い古いパックでは常に false**＝全部出す */
 function twoMaru_(q){ return q.st==='消灯' || (q.st==='あと一歩' && q.act==='根拠'); }
-/** きょう、この端末で正解した肢。パックの印は🔄更新まで変わらないので、
-    これを外さないと**さっき正解した肢がすぐまた出る**（2026-08-19）。 */
-function okToday_(){
+/* ⚠ **パックの印は「取り込んだ瞬間の写真」**なので、その日のうちに古びる（2026-08-19夜に実機で発覚）。
+   社長のiPhoneで「◯2回未満」が0件、iPad miniでは10件出た。同じ版・同じ科目なのに違ったのは、
+   **iPhoneのパックが「今日その肢を解く前」のもの**で、解いて消灯から落ちた肢がまだ消灯のままだったため。
+   （逆に、きょう正解して◯2回に達した肢が、いつまでも出続ける向きのズレも起きる）
+
+   → **きょうこの端末で解いたぶんを、パックの印に重ねてから判定する。**
+   これで、パックが古くても「いま解くべき肢」が正しく出る。 */
+function todayAdj_(){
   var m={};
-  readSess().log.forEach(function(r){ if((r.set||'r7')===curSet && r.ok) m[r.name+'|'+r.eda]=1; });
+  readSess().log.forEach(function(r){
+    if((r.set||'r7')!==curSet) return;
+    var k=r.name+'|'+r.eda;
+    (m[k]=m[k]||[]).push(!!r.ok);
+  });
   return m;
+}
+/** ◯が2回付いているか（きょうの解答を重ねた、いまの姿） */
+function twoMaruNow_(q, adj){
+  var seq=adj[q.name+'|'+q.eda];
+  if(seq && seq.length){
+    if(seq.length>=2) return seq[seq.length-1] && seq[seq.length-2];   // きょう2回解いた＝それが直近2回
+    if(!seq[seq.length-1]) return false;        // きょう間違えた＝◯2回は途切れた（消灯でも出す）
+    return twoMaru_(q);                          // きょう1回正解＝前が◯なら2回そろった
+  }
+  return twoMaru_(q);
 }
 function buildList(){
   reviewMode=false;
   var hasMark = !!(pack.items.length && pack.items[0].st);   // 古いパックには st が無い
-  var okd = (only==='yet') ? okToday_() : {};
+  var adj = (only!=='all') ? todayAdj_() : {};
   list = pack.items.filter(function(q){
     if(!(subject==='全' || q.subject===subject)) return false;
     if(only==='all' || !hasMark) return true;
-    if(only==='yet')    return !twoMaru_(q) && !okd[q.name+'|'+q.eda];
-    if(only==='reason') return q.st==='あと一歩' && q.act==='根拠';
+    if(only==='yet')    return !twoMaruNow_(q, adj);
+    if(only==='reason') return q.st==='あと一歩' && q.act==='根拠' && twoMaruNow_(q, adj);
     return true;
   });
   if(order==='shuffle'){
@@ -650,20 +669,35 @@ function renderOnlySeg(){
   seg.style.display = hasMark ? '' : 'none';
   Array.prototype.forEach.call(seg.querySelectorAll('button'), function(b){
     b.classList.toggle('on', b.getAttribute('data-only')===only);
-    b.onclick=function(){ only=b.getAttribute('data-only'); savePref(); renderOnlySeg(); buildList(); render(); closePanel(); };
+    b.onclick=function(){
+      only=b.getAttribute('data-only'); savePref(); renderOnlySeg(); buildList(); render(); closePanel();
+      /* 絞り込みは**状態が材料**なので、選んだ瞬間にオンラインなら取り直す
+         （古い印のまま「0問」と出るのを防ぐ・2026-08-19夜の件） */
+      if(only!=='all' && navigator.onLine) tryRefresh(false);
+    };
   });
 }
 
 /* ===== 1問の描画 ===== */
 function render(){
   var host=$('cardHost'); host.innerHTML='';
+  /* 絞り込み中は**データの取り込み時刻**も出す。
+     「0問」と出たときに、**本当に無いのか／古いデータなのか**を社長が自分で見分けられるようにする
+     （2026-08-19夜、iPhoneで0問・iPadで10問になった件。原因はパックの新旧だった）。 */
+  var atTxt='';
+  if(only!=='all'){
+    var at=localStorage.getItem(atKey());
+    if(at) atTxt='　（データ '+fmtTime(at)+'）';
+  }
   $('countText').textContent = reviewMode? ('間違い復習：'+list.length+'問')
-    : (subject+(only==='yet'?'・◯2回未満':only==='reason'?'・根拠だけ':'')+'：'+list.length+'問');
+    : (subject+(only==='yet'?'・◯2回未満':only==='reason'?'・根拠だけ':'')+'：'+list.length+'問'+atTxt);
   if(!list.length){
-    host.appendChild(el('div','notice',
-      only==='yet'    ? 'この科目は、◯が2回付いていない肢がありません。（残っているのは根拠だけ）' :
+    var emp=el('div','notice');
+    emp.innerHTML =
+      only==='yet'    ? 'この科目は、◯が2回付いていない肢がありません。<br><small>（残っているのは根拠だけ）<br>⚠ <b>データが古いと0問に見えることがあります。</b>上の <b>🔄更新</b> を押すと数え直します。</small>' :
       only==='reason' ? 'この科目に「根拠だけ足りない肢」はありません。' :
-                        'この科目には問題がありません。'));
+                        'この科目には問題がありません。';
+    host.appendChild(emp);
     $('progText').textContent='🚃'+SETS_UI[curSet].short+' '+subject+'：0問'; $('barFill').style.width='0%';
     return;
   }
