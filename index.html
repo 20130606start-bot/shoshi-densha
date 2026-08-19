@@ -58,6 +58,17 @@
     border-radius:10px; padding:10px 12px; margin-bottom:12px; white-space:pre-wrap; word-break:break-word; }
   .zentei b{ display:block; font-size:12px; font-weight:800; color:var(--fg); margin-bottom:4px; letter-spacing:.05em; }
   .bun{ font-size:34px; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+  /* ⚠ 報告の1行（2026-08-19）。**ボタン列には入れない**＝◯✕や手応えと並べると
+     幅が痩せるうえ、揺れる電車で押し間違える。本文の下に、控えめな1行で置く。 */
+  .bunrow{ margin-top:10px; }
+  .bunbtn{ background:none; border:none; color:var(--sub); font-size:14px; font-weight:700;
+    padding:6px 0; text-decoration:underline; text-underline-offset:3px; }
+  .bunbtn.on{ color:var(--warn); text-decoration:none; }
+  .bunnote{ margin-top:8px; }
+  .bunnote textarea{ width:100%; font-family:inherit; font-size:16px; line-height:1.6; padding:10px 12px;
+    background:var(--card2); color:var(--fg); border:1px solid var(--line); border-radius:10px; resize:vertical; }
+  .bunsave{ margin-top:8px; background:var(--card2); color:var(--fg); border:1px solid var(--line);
+    border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; }
   .ansrow{ display:flex; gap:12px; margin-top:18px; }
   .ansbtn{ flex:1; border:2px solid var(--line); background:var(--card2); color:var(--fg);
     border-radius:14px; padding:16px 0; font-size:24px; font-weight:800; }
@@ -167,7 +178,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v14';
+var BUILD = 'v15';
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -176,6 +187,7 @@ var LS_AT   = 'shoshi_pack_at_v1';
 var LS_PREF = 'shoshi_pref_v1';
 var LS_Q    = 'shoshi_queue_v1';   // 未送信の解答（本体へ同期待ち）
 var LS_TQ   = 'shoshi_tq_v1';      // 未送信の手応え（同上・2026-08-16）
+var LS_BQ   = 'shoshi_bq_v1';      // 未送信の⚠報告（2026-08-19）
 var LS_DAY  = 'shoshi_day_v1';     // きょう解いた数（端末表示用）
 var LS_SESS = 'shoshi_sess_v1';    // きょうの解答ログ（リザルト・間違い復習用）
 
@@ -258,6 +270,37 @@ var TEG=[['wakaranai','わからない','n'],['ayashii','あやしい','a'],
          ['chotto','ちょっとわかった','c'],['wakatta','わかった','w']];
 function readTQ(){ try{ return JSON.parse(localStorage.getItem(LS_TQ)||'[]'); }catch(e){ return []; } }
 function writeTQ(q){ try{ localStorage.setItem(LS_TQ, JSON.stringify(q.slice(-3000))); }catch(e){} }
+
+/* ===== ⚠ この文がおかしい（2026-08-19・社長の依頼）=====================
+ * 社長「一問一答と同じように、**電車モードにも報告できる窓口が欲しい**」。
+ *
+ * 本体アプリ(v150)と同じ思想:
+ *   ・**読んでいる最中に押せる**（解いた後ではない）＝気づいた瞬間に残す口
+ *   ・**ひとことは空でよい**（書かせると勉強が止まる。肢さえ分かれば原本と照合できる）
+ *   ・ボタン列（◯✕・手応え）には**入れない**。押し間違いと幅の圧迫を避け、本文の下に1行で置く
+ * 電車なので端末に貯め、電波が入ったら受信箱の ?bdata= へ送る（解答・手応えと同じ作り）。
+ */
+function readBQ(){ try{ return JSON.parse(localStorage.getItem(LS_BQ)||'[]'); }catch(e){ return []; } }
+function writeBQ(q){ try{ localStorage.setItem(LS_BQ, JSON.stringify(q.slice(-500))); }catch(e){} }
+/** きょう報告した肢（ボタンの見た目を「報告ずみ」に変える用。取消は本体アプリでやる） */
+function bunReported(qi){
+  var k=qi.name+'|'+qi.eda;
+  return readBQ().some(function(r){ return (r.set||'r7')===curSet && (r.name+'|'+r.eda)===k; });
+}
+function pushBun(qi, note){
+  var q=readBQ();
+  q.push({ id:newId(), t:new Date().toISOString(), set:curSet, name:qi.name, eda:qi.eda, note:String(note||'') });
+  writeBQ(q); updateSyncInfo(); scheduleSync();
+}
+/** あとから「ひとこと」を足す（まだ送っていない同じ肢の報告に書き足す） */
+function addBunNote(qi, note){
+  var q=readBQ(), k=qi.name+'|'+qi.eda, done=false;
+  for(var i=q.length-1;i>=0;i--){
+    if((q[i].set||'r7')===curSet && (q[i].name+'|'+q[i].eda)===k){ q[i].note=String(note||''); done=true; break; }
+  }
+  if(!done) q.push({ id:newId(), t:new Date().toISOString(), set:curSet, name:qi.name, eda:qi.eda, note:String(note||'') });
+  writeBQ(q); updateSyncInfo(); scheduleSync();
+}
 function recordTegotaeLocal(qi, lv){
   var q=readTQ();
   q.push({ id: newId(), t: new Date().toISOString(), set: curSet, name: qi.name, eda: qi.eda, lv: lv });
@@ -278,6 +321,35 @@ function tegotaeBox(qi){
     row.appendChild(b);
   });
   box.appendChild(row);
+  return box;
+}
+
+/** ⚠ の1行（本文のすぐ下）。押すと積まれ、**ひとことの欄が開く（空でよい）**。
+    本体アプリ v150 と同じ形。取り消しは家のアプリでやる（電車では消す操作を出さない＝
+    揺れる場所で押し間違えて「無かったこと」にならないように）。 */
+function bunReportRow(qi){
+  var box=el('div','bunrow');
+  var done=bunReported(qi);
+  var b=el('button','bunbtn'+(done?' on':''), done? '⚠ 報告しました（ひとことを書けます）':'⚠ この文がおかしい');
+  box.appendChild(b);
+  var note=null;
+  function openNote(){
+    if(note) return;
+    note=el('div','bunnote');
+    var ta=document.createElement('textarea');
+    ta.rows=2; ta.placeholder='ひとこと（空でも送れます）';
+    var save=el('button','bunsave','ひとことを送る');
+    save.onclick=function(){ addBunNote(qi, ta.value); save.textContent='✅ 送りました'; };
+    note.appendChild(ta); note.appendChild(save);
+    box.appendChild(note);
+  }
+  b.onclick=function(){
+    if(!bunReported(qi)) pushBun(qi, '');
+    b.classList.add('on');
+    b.textContent='⚠ 報告しました（ひとことを書けます）';
+    openNote();
+  };
+  if(done) openNote();
   return box;
 }
 
@@ -353,7 +425,7 @@ function syncNow(){
 /** 手応えを送る（?tdata= の別口）。解答と同じ作り＝失敗しても貯めたまま消えない。 */
 function syncTegNow(){
   if(!canSend_()) return;
-  var q=readTQ(); if(!q.length){ updateSyncInfo(); return; }
+  var q=readTQ(); if(!q.length){ syncBunNow(); return; }   // 手応えが無ければ⚠報告へ進む
   var recs=q.slice(0,40);
   var batch=recs[0].id+'_t'+recs.length;
   var payload=recs.map(function(r){ return {id:r.id, t:r.t, set:(r.set||'r7'), name:r.name, eda:r.eda, lv:r.lv}; });
@@ -365,11 +437,29 @@ function syncTegNow(){
     writeTQ(readTQ().filter(function(r){ return !sent[r.id]; }));
     updateSyncInfo();
     if(readTQ().length) setTimeout(syncTegNow, 500);
+    else syncBunNow();                           // 手応えを送り切ったら⚠報告を送る
+  });
+}
+/** ⚠報告を送る（?bdata= の別口）。解答・手応えと同じ作り＝失敗しても貯めたまま消えない。 */
+function syncBunNow(){
+  if(!canSend_()) return;
+  var q=readBQ(); if(!q.length){ updateSyncInfo(); return; }
+  var recs=q.slice(0,40);
+  var batch=recs[0].id+'_b'+recs.length;
+  var payload=recs.map(function(r){ return {id:r.id, t:r.t, set:(r.set||'r7'), name:r.name, eda:r.eda, note:r.note||''}; });
+  syncing=true; updateSyncInfo('送信中…');
+  jsonp(INBOX_URL+'?token='+INBOX_TOKEN+'&batch='+encodeURIComponent(batch)+'&bdata='+encodeURIComponent(JSON.stringify(payload)), function(err,res){
+    syncing=false;
+    if(err || !res || !res.ok){ updateSyncInfo(); return; }
+    var sent={}; recs.forEach(function(r){ sent[r.id]=1; });
+    writeBQ(readBQ().filter(function(r){ return !sent[r.id]; }));
+    updateSyncInfo();
+    if(readBQ().length) setTimeout(syncBunNow, 500);
   });
 }
 function updateSyncInfo(extra){
   var elx=$('syncInfo'); if(!elx) return;
-  var day=readDay(), qn=readQ().length+readTQ().length;   // 解答と手応えを合わせた「未送信」
+  var day=readDay(), qn=readQ().length+readTQ().length+readBQ().length;   // 解答・手応え・⚠報告を合わせた「未送信」
   var t='きょう '+day.n+'問（正解 '+day.ok+'）';
   if(extra) t+='　'+extra;
   else if(qn>0) t+='　／　未送信 '+qn+'件'+(navigator.onLine?'':'（電波復帰で自動送信）');
@@ -611,6 +701,7 @@ function render(){
     card.appendChild(zbox);
   }
   card.appendChild(el('div','bun', q.bun));
+  card.appendChild(bunReportRow(q));
 
   var ansrow=el('div','ansrow');
   var bm=el('button','ansbtn maru'); bm.innerHTML='◯<span class="sub">正しい</span>';
