@@ -104,7 +104,7 @@
   .tegotae button.on.c{ background:#bcd98a; border-color:#bcd98a; }   /* ちょっとわかった */
   .tegotae button.on.a{ background:#e3c06a; border-color:#e3c06a; }   /* あやしい */
   .tegotae button.on.n{ background:#b8a0d8; border-color:#b8a0d8; }   /* わからない（✕の赤とは別色） */
-  /* ===== v16: 片手操作の下端固定バー =======================================
+  /* ===== v17: 片手操作の下端固定バー =======================================
    * 社長の⚠（2026-08-21 18:43）:「回答後の**次へが遠い**。下部＋**左下**に置きたい」。
    * ⚠ 遠いのは「次へ」だけではない。◯✕も**本文のすぐ下**にあるので、
    *   **肢が長いと下、短いと上**へ動く＝親指が位置を覚えられない。だから両方ここへ入れる。
@@ -192,7 +192,7 @@
   <div class="foot" id="foot">オフラインでも、保存済みの問題は解けます。電波がある時に「🔄更新」で最新化。</div>
 </div>
 
-<!-- v16: 片手（左手）で回すための下端固定バー。
+<!-- v17: 片手（左手）で回すための下端固定バー。
      社長の⚠（2026-08-21 18:43・電車モードを名指し）:「**回答後の「次へ」が遠い。下部＋左下に置きたい**」。
      本体アプリは v156 で同じ形にした。こちらは**揺れる電車で押す**ので、より効く。
      中身は render/reveal が入れ替える（解答前＝◯✕／解答後＝前へ・次へ）。 -->
@@ -202,7 +202,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v17';
+var BUILD = 'v18';
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -702,7 +702,7 @@ function renderOnlySeg(){
   });
 }
 
-/* v16: 下端の固定バーの中身を入れ替える（**押す場所は動かさない**）。
+/* v17: 下端の固定バーの中身を入れ替える（**押す場所は動かさない**）。
    node を渡すと出す／null で隠す。ここ1か所に閉じ込めておかないと、
    画面を1つ足すたびに「バーが出たまま」「両方出る」が起きる。 */
 function dbarSet(node){
@@ -777,7 +777,7 @@ function render(){
   var bm=el('button','ansbtn maru'); bm.innerHTML='◯<span class="sub">正しい</span>';
   var bb=el('button','ansbtn batsu'); bb.innerHTML='✕<span class="sub">誤り</span>';
   ansrow.appendChild(bm); ansrow.appendChild(bb);
-  dbarSet(ansrow);   // v16: ◯✕は**下端の固定バー**へ（本文の下だと肢の長さで場所が動く）
+  dbarSet(ansrow);   // v17: ◯✕は**下端の固定バー**へ（本文の下だと肢の長さで場所が動く）
 
   var revealed=false;
   function reveal(my){
@@ -809,7 +809,7 @@ function render(){
     var next=el('button','next', idx>=list.length-1?'おわり →':'次へ →'); next.onclick=function(){ idx++; render(); };
     if(idx===0) prev.disabled=true, prev.style.opacity=.4;
     nav.appendChild(prev); nav.appendChild(next);
-    dbarSet(nav);   // v16: 答えた瞬間、下端バーの中身が◯✕から「前へ／次へ」に入れ替わる
+    dbarSet(nav);   // v17: 答えた瞬間、下端バーの中身が◯✕から「前へ／次へ」に入れ替わる
     card.appendChild(rev);
     rev.scrollIntoView({behavior:'smooth', block:'nearest'});
   }
@@ -823,7 +823,7 @@ function render(){
 /* ===== きょうのリザルト画面 ===== */
 function showResult(){
   closePanel();
-  dbarSet(null);   // v16: リザルトでは下端バーを出さない（押すものが無い）
+  dbarSet(null);   // v17: リザルトでは下端バーを出さない（押すものが無い）
   var host=$('cardHost'); host.innerHTML='';
   var day=readDay(), qn=readQ().length+readTQ().length, wrongs=wrongsNow();
   var rate = day.n? Math.round(day.ok/day.n*100) : 0;
