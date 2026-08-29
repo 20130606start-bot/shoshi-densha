@@ -34,6 +34,11 @@ self.addEventListener('fetch', function (e) {
   if (url.origin !== self.location.origin) return;
   // /shorts/（登記簿ショート動画）はキャッシュせず常にネットから＝更新が即反映される
   if (url.pathname.indexOf('/shorts/') >= 0) return;
+  /* /konkyo/（根拠ノート＝別アプリ・2026-08-29）は素通しする。
+     ここを通すと、**電車モードのSWが根拠ノートのページをキャッシュ優先で返し続け**、
+     あちらを直しても端末で変わらない、という形になる（同じオリジンに2つのアプリを
+     置いたときの、いちばん踏みやすい穴）。根拠ノートは自分のSW（konkyo/sw.js）を持っている。 */
+  if (url.pathname.indexOf('/konkyo/') >= 0) return;
   e.respondWith(
     caches.match(req).then(function (hit) {
       if (hit) return hit;

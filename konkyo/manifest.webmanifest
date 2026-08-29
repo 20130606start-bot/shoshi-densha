@@ -1,0 +1,17 @@
+{
+  "name": "司法書士 根拠ノート",
+  "short_name": "根拠ノート",
+  "description": "◯✕を答えて、根拠の一文だけを書いていく。解説は出さない。赤ペンは一問一答アプリで見る",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1420",
+  "theme_color": "#15803d",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

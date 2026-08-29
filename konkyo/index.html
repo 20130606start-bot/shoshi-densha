@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#15803d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="根拠ノート">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>司法書士 根拠ノート</title>
+<!--
+  ===== 根拠ノート（3つ目のアプリ・2026-08-29）=================================
+
+  社長の仕様（2026-08-28 18:57・📮ホーム。**要望ではなく仕様書**なので、こちらで足さない）:
+    「復習専科／根拠の一文モード／論点の核心について、分かる範囲で書いていくモード／
+      迷いなくかけるように、**そこで添削はされない**／1問ずつかいていく／**解説もでない**／
+      ◯✕回答はできる／**解説がでないのが、引き算**／あとで、添削してもらった結果が一覧で表示／
+      添削の表示だけで、登録はしてくれない／自分でこれまで通り書き足すこと」
+
+  2026-08-29に社長が決めたこと:
+    「電車モードみたいに**一心不乱に進める、集中できるもの**。一問一答とも電車モードとも**別のもの**。
+      独立したアプリで、書いたものを送信。**結果を一問一答でみれる**、というならOK」
+    → だから電車モードに1モード足すのではなく、**別のアプリ**にした（別URL・別アイコン）。
+
+  ⚠ 電車モードとは「画面の作りが逆」＝あちらは**指だけ**なので下端固定バーが正解。
+     こちらは**キーボードが画面の半分を占める**ので、書く場面では固定バーを使わない
+     （固定バーはキーボードに隠れる）。◯✕までは固定バー、書き始めたら流し込み。
+
+  ⭐ 同じ置き場（shoshi-densha リポジトリ）に置いてある理由:
+     社長から見れば別アプリだが、**同一オリジンなので電車モードが落とした問題データを
+     そのまま使える**（起動が速い・通信ゼロ）。共通の仕組みを3本目にコピーしないため。
+     ⚠ ただし**送信の待ち行列だけは別のキー**にしてある（両方のアプリが同じ列を
+        取り合うと、片方の送信で消えたぶんをもう片方が二重に送る形になるため）。
+
+  出す肢＝**あと一歩（根拠だけ足りない）**＝◯は2回付いていて、根拠の一文だけが空の肢。
+  ここに書けば消灯する肢しか出さない＝**書いたぶんだけ、まっすぐ前に進む。**
+-->
+<style>
+  :root{
+    /* 電車モードは青（--accent:#3b82f6）。こちらは**緑**＝本体アプリで根拠の枠が緑なのに合わせた。
+       色を分けているのは飾りではなく、**間違ったアプリを開いたことが一目で分かる**ようにするため。 */
+    --bg:#0f1420; --card:#182131; --card2:#1e293b; --line:#2a3852; --fg:#e8eef7; --sub:#9fb0c8;
+    --maru:#22c55e; --batsu:#ef4444; --accent:#22c55e; --accent2:#15803d; --warn:#f59e0b;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif; }
+  body{ padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  .wrap{ max-width:560px; margin:0 auto; padding:0 14px 40px; }
+  header{ position:sticky; top:0; z-index:10; background:rgba(15,20,32,.94); backdrop-filter:blur(8px);
+    padding:calc(env(safe-area-inset-top) + 6px) 14px 0; margin:0 -14px 12px; border-bottom:1px solid var(--line); }
+  .topbar{ display:flex; align-items:center; gap:10px; padding-bottom:8px; }
+  .prog{ flex:1; font-size:15px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .subjbtn{ background:var(--card2); color:var(--fg); border:1px solid var(--line); border-radius:999px;
+    padding:6px 14px; font-size:14px; font-weight:800; max-width:48%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .subjbtn:active{ transform:scale(.96); }
+  .panel{ padding:10px 0 12px; border-top:1px dashed var(--line); }
+  .hbar{ height:3px; background:var(--card); overflow:hidden; margin:0 -14px; }
+  .barfill{ height:100%; background:linear-gradient(90deg,var(--accent2),var(--maru)); width:0%; transition:width .25s; }
+  .status{ font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .dot.on{ background:var(--maru); } .dot.off{ background:var(--warn); }
+  button{ font-family:inherit; cursor:pointer; }
+  .iconbtn{ background:var(--card2); color:var(--fg); border:1px solid var(--line); border-radius:10px;
+    padding:8px 12px; font-size:14px; font-weight:700; }
+  .iconbtn:active{ transform:scale(.96); }
+  .chips{ display:flex; gap:8px; overflow-x:auto; padding:4px 0 8px; -webkit-overflow-scrolling:touch; }
+  .chip{ flex:0 0 auto; background:var(--card); color:var(--sub); border:1px solid var(--line);
+    border-radius:999px; padding:7px 14px; font-size:13px; font-weight:700; white-space:nowrap; }
+  .chip.on{ background:var(--accent2); color:#fff; border-color:var(--accent); }
+  .toolrow{ display:flex; align-items:center; gap:10px; margin:2px 0 0; flex-wrap:wrap; }
+  .toolrow .grow{ flex:1; color:var(--sub); font-size:13px; min-width:120px; }
+  .seg{ display:inline-flex; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button{ background:none; border:none; color:var(--sub); padding:7px 12px; font-size:13px; font-weight:700; }
+  .seg button.on{ background:var(--card2); color:var(--fg); }
+
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; }
+  .meta{ display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .qname{ font-size:12px; color:var(--sub); font-weight:700; }
+  .badge{ font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:var(--card2); color:var(--sub); }
+  /* 前提＝肢の上に小さく出す設問文。**必ず出す。**
+     2026-08-25に社長から同じ訴えが1日で4回来た所（前提が無いと1文字も意味が取れない肢が11肢ある）。 */
+  .zentei{ font-size:18px; line-height:1.7; color:var(--sub); background:var(--card2);
+    border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:10px; padding:10px 12px; margin-bottom:12px; white-space:pre-wrap; word-break:break-word; }
+  .zentei b{ display:block; font-size:12px; font-weight:800; color:var(--fg); margin-bottom:4px; letter-spacing:.05em; }
+  .bun{ font-size:30px; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+  .ansrow{ display:flex; gap:12px; margin-top:18px; }
+  .ansbtn{ flex:1; border:2px solid var(--line); background:var(--card2); color:var(--fg);
+    border-radius:14px; padding:16px 0; font-size:24px; font-weight:800; }
+  .ansbtn.maru{ border-color:rgba(34,197,94,.5); } .ansbtn.batsu{ border-color:rgba(239,68,68,.5); }
+  .ansbtn:active{ transform:scale(.98); }
+
+  .verdict{ font-size:20px; font-weight:900; padding:12px; border-radius:12px; text-align:center; margin:16px 0 4px; }
+  .verdict.ok{ background:rgba(34,197,94,.15); color:#5ee89b; }
+  .verdict.ng{ background:rgba(239,68,68,.15); color:#ff8a8a; }
+  /* ⚠ ここに解説を足さないこと。**出さないことがこのアプリの売り**（社長の仕様2）。
+     「ついでに出しておこう」は、このアプリを一問一答に戻す第一歩になる。 */
+  .lbl{ font-size:14px; font-weight:800; color:var(--sub); margin:18px 0 6px; letter-spacing:.03em; }
+  .write textarea{ width:100%; min-height:190px; font-family:inherit; font-size:19px; line-height:1.7;
+    padding:12px 14px; background:var(--card2); color:var(--fg);
+    border:1px solid rgba(34,197,94,.35); border-radius:12px; resize:vertical; }
+  .write textarea:focus{ outline:none; border-color:var(--maru); }
+  .hint{ font-size:13px; color:var(--sub); line-height:1.7; margin:8px 2px 0; }
+  /* 書く場面のボタンは**流し込み**（固定バーにしない）＝iPhoneのキーボードが固定バーを隠すため。
+     電車モードの下端固定バーは「指だけで回す」ための形で、ここでは逆に邪魔になる。 */
+  .wbtns{ display:flex; gap:10px; margin-top:14px; }
+  .wbtns button{ flex:1; border:none; border-radius:14px; padding:16px 0; font-size:16px; font-weight:800; }
+  .save{ background:var(--accent2); color:#fff; }
+  .skip{ background:var(--card2); color:var(--sub); border:1px solid var(--line)!important; flex:0 0 34%; }
+  .wbtns button:active{ transform:scale(.98); }
+
+  /* 解答前だけ使う下端固定バー（◯✕）。社長の片手操作の決定（本体v156・電車v17）と同じ形。
+     左寄せ・右3割は空ける＝左手の親指は画面の右まで届かない。 */
+  .dbar{ position:fixed; left:0; right:0; bottom:0; z-index:30;
+    background:rgba(15,20,32,.96); border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom); }
+  .dbar-in{ max-width:720px; margin:0 auto; padding:10px 16px 12px; display:flex; justify-content:flex-start; }
+  .dbar .ansrow{ margin-top:0; flex:1 1 auto; max-width:72%; }
+  .dbar .ansbtn{ padding:14px 0; font-size:22px; }
+  .padbar{ padding-bottom:calc(112px + env(safe-area-inset-bottom)); }
+
+  .notice{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; text-align:center;
+    color:var(--sub); font-size:15px; line-height:1.8; }
+  .notice b{ color:var(--fg); }
+  .spin{ display:inline-block; width:16px; height:16px; border:2px solid var(--line); border-top-color:var(--accent);
+    border-radius:50%; animation:sp .8s linear infinite; vertical-align:-3px; }
+  @keyframes sp{ to{ transform:rotate(360deg); } }
+  .hidden{ display:none!important; }
+  .foot{ text-align:center; color:var(--sub); font-size:11px; margin-top:24px; opacity:.7; line-height:1.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="topbar">
+      <span class="prog" id="progText">✍️ 根拠ノート</span>
+      <button class="subjbtn" id="menuBtn">メニュー ▾</button>
+    </div>
+    <div class="panel hidden" id="panel">
+      <div class="seg" id="setSeg" style="margin-bottom:10px;">
+        <button data-set="r7" class="on">令和7</button>
+        <button data-set="r6">令和6</button>
+      </div>
+      <div class="status">
+        <span class="dot" id="netDot"></span>
+        <span id="statusText">読み込み中…</span>
+      </div>
+      <div class="status" id="syncInfo"></div>
+      <div class="chips" id="subjChips"></div>
+      <div class="toolrow">
+        <span class="grow" id="countText"></span>
+        <div class="seg" id="orderSeg">
+          <button data-mode="order" class="on">出題順</button>
+          <button data-mode="shuffle">シャッフル</button>
+        </div>
+        <button class="iconbtn" id="refreshBtn">🔄 更新</button>
+      </div>
+    </div>
+    <div class="hbar"><div class="barfill" id="barFill"></div></div>
+  </header>
+
+  <div id="controls" class="hidden"><div id="cardHost"></div></div>
+
+  <div id="notice" class="notice"><span class="spin"></span> 問題を読み込んでいます…</div>
+
+  <div class="foot" id="foot">
+    書いた一文は本体へ送られます。赤ペン（添削）は一問一答アプリで見ます。<br>
+    ここでは添削しません。迷わず書くための場所です。
+  </div>
+</div>
+
+<div class="dbar hidden" id="dbar"><div class="dbar-in" id="dbarIn"></div></div>
+
+<script>
+/* ===== 設定 ===== */
+/* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js --app konkyo が両方まとめて上げる）。 */
+var BUILD = 'k2';
+var PACK_URL  = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
+var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
+var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
+
+/* ⭐ 問題データのキーは**電車モードと同じ**＝同一オリジンなので、あちらが落としたものをそのまま使う
+   （起動が速い・通信ゼロ・端末の容量も増えない）。**読むだけ**で、こちらからは上書きしない。 */
+var LS_PACK = 'shoshi_pack_v1';
+var LS_AT   = 'shoshi_pack_at_v1';
+/* ⚠ 送信の待ち行列だけは**別のキー**。電車モードと共有すると、片方が送って消したぶんを
+   もう片方が二重に送る／取りこぼす形になる（同じ列を2つのアプリで取り合わない）。 */
+var LS_PREF = 'konkyo_pref_v1';
+var LS_Q    = 'konkyo_q_v1';    // 未送信の解答（◯✕）
+var LS_RQ   = 'konkyo_rq_v1';   // 未送信の根拠の一文
+var LS_DAY  = 'konkyo_day_v1';  // きょう書いた数（端末表示用）
+var LS_DONE = 'konkyo_done_v1'; // 送信ずみの肢（パックが古いままでも二度出さないため）
+
+/* ===== 状態 ===== */
+var SETS_UI = { r7:{label:'令和7'}, r6:{label:'令和6'} };
+var curSet = 'r7';
+var pack = null;
+var subject = '全';
+var order = 'order';
+var list = [], idx = 0;
+var picked = null;          // いまの肢に出した◯✕（null＝まだ解答していない）
+function packKey(){ return curSet==='r7' ? LS_PACK : 'shoshi_pack_'+curSet+'_v1'; }
+function atKey(){ return curSet==='r7' ? LS_AT : 'shoshi_pack_at_'+curSet+'_v1'; }
+
+/* ===== ユーティリティ ===== */
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+function todayKey(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function subjectOf(name){ return String(name).replace(/[0-9０-９]+\s*$/,'').trim(); }
+function keyOf(name, eda){
+  return String(name).replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xfee0);})
+    .replace(/[\s　]/g,'').trim() + '|' + String(eda).trim();
+}
+function loadPref(){ try{ var p=JSON.parse(localStorage.getItem(LS_PREF)||'{}');
+  if(p.subject) subject=p.subject; if(p.order) order=p.order; if(p.set&&SETS_UI[p.set]) curSet=p.set; }catch(e){} }
+function savePref(){ try{ localStorage.setItem(LS_PREF, JSON.stringify({subject:subject, order:order, set:curSet})); }catch(e){} }
+
+function readJSON(k, def){ try{ var v=JSON.parse(localStorage.getItem(k)||'null'); return v==null?def:v; }catch(e){ return def; } }
+function writeJSON(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function readQ(){ return readJSON(LS_Q, []); }
+function writeQ(q){ writeJSON(LS_Q, q.slice(-2000)); }
+function readRQ(){ return readJSON(LS_RQ, []); }
+function writeRQ(q){ writeJSON(LS_RQ, q.slice(-2000)); }
+function readDone(){ return readJSON(LS_DONE, {}); }
+function readDay(){ var v=readJSON(LS_DAY, null); return (v&&v.d===todayKey())? v : {d:todayKey(), n:0}; }
+function bumpDay(){ var v=readDay(); v.n++; writeJSON(LS_DAY, v); }
+
+/* ===== パック（電車モードが落としたものを読む。無ければ自分で取る） ===== */
+function readStoredPack(){ try{ var raw=localStorage.getItem(packKey()); return raw?JSON.parse(raw):null; }catch(e){ return null; } }
+function savePack(p){ try{ localStorage.setItem(packKey(), JSON.stringify(p)); localStorage.setItem(atKey(), new Date().toISOString()); return true; }catch(e){ return false; } }
+
+var __jsonpSeq=0;
+function jsonp(url, done){
+  var cbName='__konkyoCb'+(++__jsonpSeq);
+  var s=document.createElement('script'); var finished=false;
+  var to=setTimeout(function(){ finish(new Error('timeout')); }, 20000);
+  function cleanup(){ clearTimeout(to); try{ delete window[cbName]; }catch(e){ window[cbName]=null; } if(s.parentNode) s.parentNode.removeChild(s); }
+  function finish(err,data){ if(finished) return; finished=true; cleanup(); done(err,data); }
+  window[cbName]=function(data){ finish(null,data); };
+  s.onerror=function(){ finish(new Error('network')); };
+  s.src=url+(url.indexOf('?')<0?'?':'&')+'callback='+cbName;
+  document.head.appendChild(s);
+}
+function fetchPack(done){ jsonp(PACK_URL+'?set='+curSet+'&t='+Date.now(), done); }
+
+/* ===== 出す肢を決める =====
+ * **あと一歩（根拠だけ足りない）** ＝ ◯は2回付いていて、根拠の一文だけが空の肢。
+ * ここに書けば消灯する肢しか出さない＝書いたぶんだけ、まっすぐ前に進む。
+ * ⚠ プールを広げないこと。広げた瞬間に、このアプリは一問一答の劣化版になる。 */
+function isTarget(it){ return it.st==='あと一歩' && it.act==='根拠'; }
+
+function buildList(){
+  var done=readDone();
+  var arr=(pack&&pack.items?pack.items:[]).filter(function(it){
+    if(!isTarget(it)) return false;
+    if(done[keyOf(it.name,it.eda)]) return false;      // このアプリで書いて送ったものは、もう出さない
+    if(subject!=='全' && subjectOf(it.name)!==subject) return false;
+    return true;
+  });
+  if(order==='shuffle'){ for(var i=arr.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=arr[i]; arr[i]=arr[j]; arr[j]=t; } }
+  list=arr; idx=0; picked=null;
+}
+
+function subjectsOf(){
+  var m={}, out=['全'];
+  (pack&&pack.items?pack.items:[]).forEach(function(it){ if(isTarget(it)){ var s=subjectOf(it.name); if(!m[s]){ m[s]=1; out.push(s); } } });
+  return out;
+}
+
+/* ===== 画面 ===== */
+function setStatus(text, online){
+  $('statusText').textContent=text;
+  $('netDot').className='dot '+(online?'on':'off');
+}
+function updateSyncInfo(extra){
+  var e=$('syncInfo'); if(!e) return;
+  var day=readDay(), qn=readQ().length+readRQ().length;
+  var t='きょう '+day.n+'本 書きました';
+  if(extra) t+='　'+extra;
+  else if(qn>0) t+='　／　未送信 '+qn+'件'+(navigator.onLine?'':'（電波が入ったら自動で送ります）');
+  else if(day.n>0) t+='　／　✅ 本体へ送信ずみ';
+  e.textContent=t;
+}
+function paintChips(){
+  var host=$('subjChips'); host.innerHTML='';
+  subjectsOf().forEach(function(s){
+    var b=el('button','chip'+(s===subject?' on':''), s);
+    b.onclick=function(){ subject=s; savePref(); buildList(); paintChips(); render(); };
+    host.appendChild(b);
+  });
+}
+function paintProgress(){
+  $('barFill').style.width = list.length ? Math.round(idx/list.length*100)+'%' : '0%';
+  $('progText').textContent = list.length ? ('✍️ 根拠ノート　'+(idx+1)+' / '+list.length) : '✍️ 根拠ノート';
+  $('countText').textContent = '根拠だけ足りない肢：'+list.length+' 本';
+}
+
+function render(){
+  var host=$('cardHost'); host.innerHTML='';
+  $('dbar').classList.add('hidden');
+  $('controls').classList.remove('hidden');
+  paintProgress();
+
+  if(!list.length){
+    $('controls').classList.add('hidden');
+    $('notice').classList.remove('hidden');
+    $('notice').innerHTML = pack
+      ? '<b>この年度・科目に、いま書くものはありません。</b><br>' +
+        '（出るのは「◯が2回付いていて、根拠の一文だけが空の肢」だけです）<br>' +
+        'メニューから年度や科目を変えるか、🔄更新でいちばん新しい状態にしてください。'
+      : '<b>問題データがありません。</b><br>電波のある所で「🔄 更新」を押してください。';
+    return;
+  }
+  $('notice').classList.add('hidden');
+  if(idx>=list.length){ renderDone(); return; }
+
+  var it=list[idx];
+  var card=el('div','card');
+  var meta=el('div','meta');
+  meta.appendChild(el('span','qname', it.name+'　肢'+it.eda));
+  meta.appendChild(el('span','badge','根拠だけ'));
+  card.appendChild(meta);
+
+  if(it.zentei && String(it.zentei).trim()){
+    var z=el('div','zentei');
+    z.appendChild(el('b',null,'前提'));
+    z.appendChild(document.createTextNode(String(it.zentei).trim()));
+    card.appendChild(z);
+  }
+  card.appendChild(el('div','bun', it.bun));
+  host.appendChild(card);
+
+  if(picked===null){ showAnswerBar(it); }
+  else { showWrite(it); }
+}
+
+/* 解答前＝下端固定バーに◯✕（片手・親指の位置が動かない） */
+function showAnswerBar(it){
+  $('controls').classList.add('padbar');
+  var row=el('div','ansrow');
+  [['◯','maru','○'],['✕','batsu','×']].forEach(function(a){
+    var b=el('button','ansbtn '+a[1], a[0]);
+    b.onclick=function(){ answer(it, a[2]); };
+    row.appendChild(b);
+  });
+  var host=$('dbarIn'); host.innerHTML=''; host.appendChild(row);
+  $('dbar').classList.remove('hidden');
+}
+
+function answer(it, my){
+  picked=my;
+  /* ◯✕は既存の解答の口（?data=）でそのまま本体へ送る＝配管を1本も足していない。
+     ⚠ 送るのは「自分がどう答えたか」だけ。正誤の判定はサーバー側の正解と突き合わせて本体が行う。 */
+  var q=readQ();
+  q.push({ id:Date.now()+'_'+Math.random().toString(36).slice(2,8), t:new Date().toISOString(),
+           set:curSet, name:it.name, eda:it.eda, my:my });
+  writeQ(q);
+  scheduleSync();
+  render();
+  window.scrollTo(0, 0);
+}
+
+/* 解答後＝判定（1行だけ）＋書く欄。**解説は出さない** */
+function showWrite(it){
+  $('controls').classList.remove('padbar');
+  $('dbar').classList.add('hidden');
+  var host=$('cardHost');
+  var ok = (String(it.ans).indexOf('○')>=0 || String(it.ans).indexOf('◯')>=0) ? '○' : '×';
+  var hit = (picked===ok);
+  host.appendChild(el('div','verdict '+(hit?'ok':'ng'), hit ? ('正解　答えは '+ok) : ('ちがいました　答えは '+ok)));
+
+  var w=el('div','write');
+  w.appendChild(el('div','lbl','根拠の一文（分かる範囲で・自分の言葉で）'));
+  var ta=el('textarea');
+  ta.setAttribute('placeholder','なぜその答えになるのか。きれいな文でなくてよい。');
+  ta.setAttribute('autocapitalize','off'); ta.setAttribute('autocorrect','off');
+  w.appendChild(ta);
+  w.appendChild(el('div','hint','ここでは添削しません。書けたら次へ。赤ペンは、あとで一問一答アプリの一覧で見ます。'));
+
+  var btns=el('div','wbtns');
+  var save=el('button','save','書けた → 次へ');
+  save.onclick=function(){
+    var text=ta.value.trim();
+    if(!text){ ta.focus(); return; }     // 空では送らない（書くのがこのアプリの用）
+    saveReason(it, text);
+    next();
+  };
+  var skip=el('button','skip','とばす');
+  skip.onclick=function(){ next(); };    // 手が止まったら飛ばせる＝迷いなく進むため（社長の仕様5）
+  btns.appendChild(save); btns.appendChild(skip);
+  w.appendChild(btns);
+  host.appendChild(w);
+  ta.focus();
+}
+
+function saveReason(it, text){
+  var q=readRQ();
+  q.push({ id:Date.now()+'_'+Math.random().toString(36).slice(2,8), t:new Date().toISOString(),
+           set:curSet, name:it.name, eda:it.eda, text:text.slice(0,1000) });
+  writeRQ(q);
+  var done=readDone(); done[keyOf(it.name,it.eda)]=1; writeJSON(LS_DONE, done);
+  bumpDay();
+  scheduleSync();
+}
+
+function next(){ idx++; picked=null; render(); window.scrollTo(0,0); }
+
+function renderDone(){
+  var host=$('cardHost'); host.innerHTML='';
+  var n=el('div','notice');
+  n.innerHTML='<b>この並びは、ここまでです。</b><br>きょう書いた本数は上に出ています。<br>' +
+              '赤ペン（添削）は、一問一答アプリの一覧で見てください。';
+  host.appendChild(n);
+  $('dbar').classList.add('hidden');
+}
+
+/* ===== 送信（解答＝?data= ／ 根拠＝?rdata=）=====
+ * 電車モードの作りと**まったく同じ**＝失敗しても端末に貯めたまま消えない。重複はサーバーがidで弾く。 */
+var syncTimer=null, syncing=false;
+function scheduleSync(){ updateSyncInfo(); if(syncTimer) clearTimeout(syncTimer); syncTimer=setTimeout(syncNow, 3000); }
+function canSend_(){
+  if(/^(localhost|127\.)/.test(location.hostname) && location.search.indexOf('sync=1')<0){ updateSyncInfo('（ローカル・送信オフ）'); return false; }
+  if(syncing || !navigator.onLine || !INBOX_URL){ updateSyncInfo(); return false; }
+  return true;
+}
+function syncNow(){
+  if(!canSend_()) return;
+  var q=readQ(); if(!q.length){ syncReasonNow(); return; }
+  var recs=q.slice(0,40);
+  var batch=recs[0].id+'_'+recs.length;
+  var payload=recs.map(function(r){ return {id:r.id,t:r.t,set:(r.set||'r7'),name:r.name,eda:r.eda,my:r.my}; });
+  syncing=true; updateSyncInfo('送信中…');
+  jsonp(INBOX_URL+'?token='+INBOX_TOKEN+'&batch='+encodeURIComponent(batch)+'&data='+encodeURIComponent(JSON.stringify(payload)), function(err,res){
+    syncing=false;
+    if(err||!res||!res.ok){ updateSyncInfo(); return; }
+    var sent={}; recs.forEach(function(r){ sent[r.id]=1; });
+    writeQ(readQ().filter(function(r){ return !sent[r.id]; }));
+    updateSyncInfo();
+    if(readQ().length) setTimeout(syncNow,500); else syncReasonNow();
+  });
+}
+function syncReasonNow(){
+  if(!canSend_()) return;
+  var q=readRQ(); if(!q.length){ updateSyncInfo(); return; }
+  var recs=q.slice(0,20);   // 一文は長いのでURLが伸びる。解答より少なく刻む
+  var batch=recs[0].id+'_r'+recs.length;
+  var payload=recs.map(function(r){ return {id:r.id,t:r.t,set:(r.set||'r7'),name:r.name,eda:r.eda,text:r.text}; });
+  syncing=true; updateSyncInfo('送信中…');
+  jsonp(INBOX_URL+'?token='+INBOX_TOKEN+'&batch='+encodeURIComponent(batch)+'&rdata='+encodeURIComponent(JSON.stringify(payload)), function(err,res){
+    syncing=false;
+    if(err||!res||!res.ok){ updateSyncInfo(); return; }
+    var sent={}; recs.forEach(function(r){ sent[r.id]=1; });
+    writeRQ(readRQ().filter(function(r){ return !sent[r.id]; }));
+    updateSyncInfo();
+    if(readRQ().length) setTimeout(syncReasonNow,500);
+  });
+}
+
+/* ===== 更新（パックを取り直す） ===== */
+function refresh(){
+  setStatus('取りに行っています…', navigator.onLine);
+  fetchPack(function(err,data){
+    if(err||!data||!data.items){ setStatus('取れませんでした（保存ぶんで続けます）', false); return; }
+    pack=data; savePack(data);
+    /* 取り直したら「送ったから出さない」印も掃除する＝サーバー側で根拠が入っていれば
+       もう対象から外れているので、印を持ち続ける必要がない（持ち続けると二重に隠す）。 */
+    writeJSON(LS_DONE, {});
+    buildList(); paintChips(); render();
+    setStatus('最新にしました（'+(pack.dataset||'')+'）', true);
+  });
+}
+
+/* ===== 起動 ===== */
+function boot(){
+  loadPref();
+  $('menuBtn').onclick=function(){ $('panel').classList.toggle('hidden'); };
+  $('refreshBtn').onclick=refresh;
+  Array.prototype.forEach.call($('setSeg').children, function(b){
+    b.onclick=function(){
+      curSet=b.getAttribute('data-set'); savePref();
+      Array.prototype.forEach.call($('setSeg').children, function(x){ x.classList.toggle('on', x===b); });
+      pack=readStoredPack(); buildList(); paintChips(); render();
+      if(!pack) refresh();
+    };
+  });
+  Array.prototype.forEach.call($('orderSeg').children, function(b){
+    b.onclick=function(){
+      order=b.getAttribute('data-mode'); savePref();
+      Array.prototype.forEach.call($('orderSeg').children, function(x){ x.classList.toggle('on', x===b); });
+      buildList(); render();
+    };
+  });
+  Array.prototype.forEach.call($('setSeg').children, function(b){ b.classList.toggle('on', b.getAttribute('data-set')===curSet); });
+  Array.prototype.forEach.call($('orderSeg').children, function(b){ b.classList.toggle('on', b.getAttribute('data-mode')===order); });
+
+  pack=readStoredPack();
+  if(pack){
+    buildList(); paintChips(); render();
+    setStatus('保存ぶんで動いています（'+(pack.dataset||'')+'）', navigator.onLine);
+  } else {
+    refresh();
+  }
+  updateSyncInfo();
+  $('foot').textContent='版 '+BUILD+'　／　書いた一文は本体へ送られます。赤ペンは一問一答アプリで見ます。';
+
+  window.addEventListener('online', function(){ setStatus('電波が入りました', true); scheduleSync(); });
+  window.addEventListener('offline', function(){ setStatus('電波がありません（書いたぶんは端末に残ります）', false); });
+  if(navigator.serviceWorker){ navigator.serviceWorker.register('./sw.js').catch(function(){}); }
+  scheduleSync();
+}
+boot();
+</script>
+</body>
+</html>
