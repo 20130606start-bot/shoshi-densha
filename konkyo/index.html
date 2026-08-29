@@ -111,6 +111,36 @@
   .save{ background:var(--accent2); color:#fff; }
   .skip{ background:var(--card2); color:var(--sub); border:1px solid var(--line)!important; flex:0 0 34%; }
   .wbtns button:active{ transform:scale(.98); }
+  .back{ background:var(--card2); color:var(--sub); border:1px solid var(--line)!important; flex:0 0 28%; }
+
+  /* ===== k3（2026-08-29）＝電車モードから持ってきたもの ==========================
+   * 社長「**電車アプリのいいところをもっと取り入れれるのでは？**」
+   * 持ってきたのは3つだけ。**解説は持ってこない**（出さないのがこのアプリの売り）。
+   *   ① 手応え4段　② ⚠ この文がおかしい　③ 前へ（戻る）
+   * ⭐ ①②はどちらも**受信箱の口が既にある**（?tdata= / ?bdata=）＝配管を1本も足していない。 */
+  /* 手応え＝並び・色・2×2は本体アプリ／電車モードと**完全に同じ**にする
+     （画面が変わっても親指の位置が変わらない）。 */
+  .tegotae{ margin:14px 0 2px; }
+  .tegotae .tg-q{ font-size:14px; color:var(--sub); margin-bottom:8px; }
+  .tegotae .tg-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .tegotae button{ font-family:inherit; font-size:17px; font-weight:700;
+    background:var(--card2); color:var(--fg); border:1px solid var(--line); border-radius:12px; padding:16px 2px; }
+  .tegotae button:active{ transform:scale(.98); }
+  .tegotae button.on{ color:#0d1117; font-weight:800; }
+  .tegotae button.on.w{ background:#8ed6b0; border-color:#8ed6b0; }   /* わかった */
+  .tegotae button.on.c{ background:#bcd98a; border-color:#bcd98a; }   /* ちょっとわかった */
+  .tegotae button.on.a{ background:#e3c06a; border-color:#e3c06a; }   /* あやしい */
+  .tegotae button.on.n{ background:#b8a0d8; border-color:#b8a0d8; }   /* わからない */
+  /* ⚠ 報告の1行。**ボタン列には入れない**＝◯✕や手応えと並べると押し間違える（電車モードの決まり）。 */
+  .bunrow{ margin-top:12px; }
+  .bunbtn{ background:none; border:none; color:var(--sub); font-size:14px; font-weight:700;
+    padding:6px 0; text-decoration:underline; text-underline-offset:3px; }
+  .bunbtn.on{ color:var(--warn); text-decoration:none; }
+  .bunnote{ margin-top:8px; }
+  .bunnote textarea{ width:100%; font-family:inherit; font-size:16px; line-height:1.6; padding:10px 12px;
+    background:var(--card2); color:var(--fg); border:1px solid var(--line); border-radius:10px; resize:vertical; }
+  .bunsave{ margin-top:8px; background:var(--card2); color:var(--fg); border:1px solid var(--line);
+    border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; }
 
   /* 解答前だけ使う下端固定バー（◯✕）。社長の片手操作の決定（本体v156・電車v17）と同じ形。
      左寄せ・右3割は空ける＝左手の親指は画面の右まで届かない。 */
@@ -177,7 +207,7 @@
 <script>
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js --app konkyo が両方まとめて上げる）。 */
-var BUILD = 'k2';
+var BUILD = 'k3';
 var PACK_URL  = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -191,6 +221,8 @@ var LS_AT   = 'shoshi_pack_at_v1';
 var LS_PREF = 'konkyo_pref_v1';
 var LS_Q    = 'konkyo_q_v1';    // 未送信の解答（◯✕）
 var LS_RQ   = 'konkyo_rq_v1';   // 未送信の根拠の一文
+var LS_TQ   = 'konkyo_tq_v1';   // 未送信の手応え（k3・電車モードと同じ ?tdata= の口へ）
+var LS_BQ   = 'konkyo_bq_v1';   // 未送信の⚠報告（k3・同じく ?bdata= の口へ）
 var LS_DAY  = 'konkyo_day_v1';  // きょう書いた数（端末表示用）
 var LS_DONE = 'konkyo_done_v1'; // 送信ずみの肢（パックが古いままでも二度出さないため）
 
@@ -224,6 +256,11 @@ function readQ(){ return readJSON(LS_Q, []); }
 function writeQ(q){ writeJSON(LS_Q, q.slice(-2000)); }
 function readRQ(){ return readJSON(LS_RQ, []); }
 function writeRQ(q){ writeJSON(LS_RQ, q.slice(-2000)); }
+function readTQ(){ return readJSON(LS_TQ, []); }
+function writeTQ(q){ writeJSON(LS_TQ, q.slice(-2000)); }
+function readBQ(){ return readJSON(LS_BQ, []); }
+function writeBQ(q){ writeJSON(LS_BQ, q.slice(-500)); }
+function newId(){ return Date.now()+'_'+Math.random().toString(36).slice(2,8); }
 function readDone(){ return readJSON(LS_DONE, {}); }
 function readDay(){ var v=readJSON(LS_DAY, null); return (v&&v.d===todayKey())? v : {d:todayKey(), n:0}; }
 function bumpDay(){ var v=readDay(); v.n++; writeJSON(LS_DAY, v); }
@@ -277,7 +314,7 @@ function setStatus(text, online){
 }
 function updateSyncInfo(extra){
   var e=$('syncInfo'); if(!e) return;
-  var day=readDay(), qn=readQ().length+readRQ().length;
+  var day=readDay(), qn=readQ().length+readRQ().length+readTQ().length+readBQ().length;
   var t='きょう '+day.n+'本 書きました';
   if(extra) t+='　'+extra;
   else if(qn>0) t+='　／　未送信 '+qn+'件'+(navigator.onLine?'':'（電波が入ったら自動で送ります）');
@@ -331,6 +368,25 @@ function render(){
     card.appendChild(z);
   }
   card.appendChild(el('div','bun', it.bun));
+
+  /* k3: ⚠ この文がおかしい（電車モードから。**ボタン列には入れない**＝押し間違えるため）。
+     ひとことは空でよい＝書かせると勉強が止まる（本体・電車モードと同じ決まり）。 */
+  var brow=el('div','bunrow');
+  var bbtn=el('button','bunbtn','⚠ この文がおかしい');
+  var bnote=el('div','bunnote'); bnote.style.display='none';
+  var bta=el('textarea'); bta.setAttribute('placeholder','ひとこと（空でも送れます）'); bta.rows=2;
+  var bsave=el('button','bunsave','送る');
+  bsave.onclick=function(){
+    var q=readBQ();
+    q.push({ id:newId(), t:new Date().toISOString(), set:curSet, name:it.name, eda:it.eda, note:bta.value.trim().slice(0,500) });
+    writeBQ(q); scheduleSync();
+    bbtn.classList.add('on'); bbtn.textContent='⚠ 送信しました'; bnote.style.display='none';
+  };
+  bnote.appendChild(bta); bnote.appendChild(bsave);
+  bbtn.onclick=function(){ bnote.style.display = (bnote.style.display==='none') ? 'block' : 'none'; };
+  brow.appendChild(bbtn); brow.appendChild(bnote);
+  card.appendChild(brow);
+
   host.appendChild(card);
 
   if(picked===null){ showAnswerBar(it); }
@@ -380,6 +436,28 @@ function showWrite(it){
   w.appendChild(ta);
   w.appendChild(el('div','hint','ここでは添削しません。書けたら次へ。赤ペンは、あとで一問一答アプリの一覧で見ます。'));
 
+  /* k3: 手応え（電車モードから）。**書いた直後がいちばん正直に押せる瞬間**なので、
+     テキストの下・ボタンの上に置く。押さなくても次へ行ける（強制しない）。
+     ⭐ 効く理由がもう1つある＝**v173で腕試しの主の物差しが「手応え」に変わった**ので、
+        ここで押したぶんだけ、腕試しの選び方が賢くなる。 */
+  var tg=el('div','tegotae');
+  tg.appendChild(el('div','tg-q','いまの手応えは？（押さなくてもいいです）'));
+  var trow=el('div','tg-row');
+  [['わからない','n','wakaranai'],['あやしい','a','ayashii'],
+   ['ちょっとわかった','c','chotto'],['わかった','w','wakatta']].forEach(function(t){
+    var b=el('button',t[1],t[0]);
+    b.onclick=function(){
+      Array.prototype.forEach.call(trow.children, function(x){ x.className=x.className.replace(' on',''); });
+      b.className=t[1]+' on';
+      var q=readTQ();
+      q.push({ id:newId(), t:new Date().toISOString(), set:curSet, name:it.name, eda:it.eda, lv:t[2] });
+      writeTQ(q); scheduleSync();
+    };
+    trow.appendChild(b);
+  });
+  tg.appendChild(trow);
+  w.appendChild(tg);
+
   var btns=el('div','wbtns');
   var save=el('button','save','書けた → 次へ');
   save.onclick=function(){
@@ -390,6 +468,11 @@ function showWrite(it){
   };
   var skip=el('button','skip','とばす');
   skip.onclick=function(){ next(); };    // 手が止まったら飛ばせる＝迷いなく進むため（社長の仕様5）
+  /* k3: 前へ（電車モードから）。**書き間違えても戻れない**のが、いちばん大きな穴だった。
+     ⚠ 戻っても、送ったものは取り消さない（受信箱は足すだけ・後の行が勝つ作り）。 */
+  var back=el('button','back','← 前へ');
+  back.onclick=function(){ prev(); };
+  if(idx>0) btns.appendChild(back);
   btns.appendChild(save); btns.appendChild(skip);
   w.appendChild(btns);
   host.appendChild(w);
@@ -407,6 +490,7 @@ function saveReason(it, text){
 }
 
 function next(){ idx++; picked=null; render(); window.scrollTo(0,0); }
+function prev(){ if(idx>0) idx--; picked=null; render(); window.scrollTo(0,0); }
 
 function renderDone(){
   var host=$('cardHost'); host.innerHTML='';
@@ -455,7 +539,41 @@ function syncReasonNow(){
     var sent={}; recs.forEach(function(r){ sent[r.id]=1; });
     writeRQ(readRQ().filter(function(r){ return !sent[r.id]; }));
     updateSyncInfo();
-    if(readRQ().length) setTimeout(syncReasonNow,500);
+    if(readRQ().length) setTimeout(syncReasonNow,500); else syncTegNow();
+  });
+}
+/* k3: 手応え（?tdata=）と⚠報告（?bdata=）＝**電車モードと同じ口へ、同じ形で**送る。
+   受信箱には1行も足していない（口はもう4本ある：解答・手応え・⚠報告・根拠）。 */
+function syncTegNow(){
+  if(!canSend_()) return;
+  var q=readTQ(); if(!q.length){ syncBunNow(); return; }
+  var recs=q.slice(0,40);
+  var batch=recs[0].id+'_t'+recs.length;
+  var payload=recs.map(function(r){ return {id:r.id,t:r.t,set:(r.set||'r7'),name:r.name,eda:r.eda,lv:r.lv}; });
+  syncing=true; updateSyncInfo('送信中…');
+  jsonp(INBOX_URL+'?token='+INBOX_TOKEN+'&batch='+encodeURIComponent(batch)+'&tdata='+encodeURIComponent(JSON.stringify(payload)), function(err,res){
+    syncing=false;
+    if(err||!res||!res.ok){ updateSyncInfo(); return; }
+    var sent={}; recs.forEach(function(r){ sent[r.id]=1; });
+    writeTQ(readTQ().filter(function(r){ return !sent[r.id]; }));
+    updateSyncInfo();
+    if(readTQ().length) setTimeout(syncTegNow,500); else syncBunNow();
+  });
+}
+function syncBunNow(){
+  if(!canSend_()) return;
+  var q=readBQ(); if(!q.length){ updateSyncInfo(); return; }
+  var recs=q.slice(0,40);
+  var batch=recs[0].id+'_b'+recs.length;
+  var payload=recs.map(function(r){ return {id:r.id,t:r.t,set:(r.set||'r7'),name:r.name,eda:r.eda,note:r.note||''}; });
+  syncing=true; updateSyncInfo('送信中…');
+  jsonp(INBOX_URL+'?token='+INBOX_TOKEN+'&batch='+encodeURIComponent(batch)+'&bdata='+encodeURIComponent(JSON.stringify(payload)), function(err,res){
+    syncing=false;
+    if(err||!res||!res.ok){ updateSyncInfo(); return; }
+    var sent={}; recs.forEach(function(r){ sent[r.id]=1; });
+    writeBQ(readBQ().filter(function(r){ return !sent[r.id]; }));
+    updateSyncInfo();
+    if(readBQ().length) setTimeout(syncBunNow,500);
   });
 }
 
