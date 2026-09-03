@@ -9,7 +9,7 @@
  *   **こちらを直しても端末で変わらない**という形になる。
  *   → ルートの sw.js に「/konkyo/ は素通しする」を1行入れてある。**あちらを消さないこと。**
  */
-const CACHE = 'shoshi-konkyo-k3';
+const CACHE = 'shoshi-konkyo-k4';
 const SHELL = [
   './',
   './index.html',
