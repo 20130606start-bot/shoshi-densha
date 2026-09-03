@@ -154,6 +154,7 @@
       <div class="seg" id="setSeg" style="margin-bottom:10px;">
         <button data-set="r7" class="on">令和7</button>
         <button data-set="r6">令和6</button>
+        <button data-set="r5">令和5</button>
       </div>
       <div class="status">
         <span class="dot" id="netDot"></span>
@@ -202,7 +203,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v18';
+var BUILD = 'v19';
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -216,7 +217,7 @@ var LS_DAY  = 'shoshi_day_v1';     // きょう解いた数（端末表示用）
 var LS_SESS = 'shoshi_sess_v1';    // きょうの解答ログ（リザルト・間違い復習用）
 
 /* ===== 状態 ===== */
-var SETS_UI = { r7:{label:'令和7', short:'令7'}, r6:{label:'令和6', short:'令6'} };
+var SETS_UI = { r7:{label:'令和7', short:'令7'}, r6:{label:'令和6', short:'令6'}, r5:{label:'令和5', short:'令5'} };
 var curSet = 'r7';         // 選択中セット（端末に保存）
 var pack = null;          // {dataset,set,generatedAt,count,items:[]}
 var subject = '全';

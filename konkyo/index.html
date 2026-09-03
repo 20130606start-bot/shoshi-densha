@@ -173,6 +173,7 @@
       <div class="seg" id="setSeg" style="margin-bottom:10px;">
         <button data-set="r7" class="on">令和7</button>
         <button data-set="r6">令和6</button>
+        <button data-set="r5">令和5</button>
       </div>
       <div class="status">
         <span class="dot" id="netDot"></span>
@@ -227,7 +228,7 @@ var LS_DAY  = 'konkyo_day_v1';  // きょう書いた数（端末表示用）
 var LS_DONE = 'konkyo_done_v1'; // 送信ずみの肢（パックが古いままでも二度出さないため）
 
 /* ===== 状態 ===== */
-var SETS_UI = { r7:{label:'令和7'}, r6:{label:'令和6'} };
+var SETS_UI = { r7:{label:'令和7'}, r6:{label:'令和6'}, r5:{label:'令和5'} };
 var curSet = 'r7';
 var pack = null;
 var subject = '全';
