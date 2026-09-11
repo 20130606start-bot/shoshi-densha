@@ -39,6 +39,9 @@ self.addEventListener('fetch', function (e) {
      あちらを直しても端末で変わらない、という形になる（同じオリジンに2つのアプリを
      置いたときの、いちばん踏みやすい穴）。根拠ノートは自分のSW（konkyo/sw.js）を持っている。 */
   if (url.pathname.indexOf('/konkyo/') >= 0) return;
+  /* /kijutsu/（枠どり練習帳＝記述式・2026-09-12）も同じ理由で素通しする。
+     こちらも自分のSW（kijutsu/sw.js）を持っている。**この行を消すと、直しても端末で変わらない。** */
+  if (url.pathname.indexOf('/kijutsu/') >= 0) return;
   e.respondWith(
     caches.match(req).then(function (hit) {
       if (hit) return hit;
