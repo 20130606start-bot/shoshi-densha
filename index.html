@@ -203,7 +203,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v20';
+var BUILD = 'v21';
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -574,7 +574,16 @@ function tryRefresh(foreground){
       // 取得失敗：保存分があればそれで続行
       var at=localStorage.getItem(atKey());
       if(pack){ setStatus('保存済みで学習中（最終取込 '+fmtTime(at)+'）', navigator.onLine); }
-      else { setStatus('取得できませんでした。電波を確認して🔄更新を', navigator.onLine); if(foreground) showFetchError(); }
+      /* 🔴 2026-09-13＝**電波のせいにしない。**この日、配信口（GASのWebアプリ）が 403
+         「アクセス権が必要です」を返すようになった。画面は「電波を確認して」と出すので、
+         社長は電波のある所で何度も押すことになる＝**直せないものを直そうとさせる。**
+         ⭐ オンラインかどうかは端末が知っている。知っていることは、言う。 */
+      else {
+        setStatus(navigator.onLine
+          ? '取得できませんでした（電波はあります＝配信口が応答していません）'
+          : '取得できませんでした。電波の入る所で🔄更新を', navigator.onLine);
+        if(foreground) showFetchError();
+      }
       return;
     }
     var ok=savePack(data);
@@ -589,7 +598,14 @@ function showFetchError(){
   $('controls').classList.add('hidden');
   $('notice').classList.remove('hidden');
   openPanel();
-  $('notice').innerHTML='⚠️ 問題を取得できませんでした。<br>電波を確認して、上の<b>🔄更新</b>を押してみてください。<br><small style="color:var(--sub)">（配信口の初期設定が未完了の可能性もあります）</small>';
+  /* 🔴 2026-09-13＝オンラインかどうかで言い分ける。「電波を確認して」と言い続けると、
+     直せないものを社長に何度も押させることになる（この日、配信口が403を返し始めた）。 */
+  $('notice').innerHTML = navigator.onLine
+    ? '⚠️ 問題を取得できませんでした。<br><b>電波はあります。</b>いま問題を配っている口が応答していません。'
+      + '<br><small style="color:var(--sub)">保存してある問題はこのまま解けます。'
+      + '直すのは私（Claude）の仕事なので、<b>何度も押さなくて大丈夫です</b>。</small>'
+    : '⚠️ 問題を取得できませんでした。<br>いま<b>電波がありません</b>。電波の入る所で上の<b>🔄更新</b>を押してください。'
+      + '<br><small style="color:var(--sub)">保存してある問題は、電波がなくても解けます。</small>';
 }
 
 /* ===== 出題リスト構築 ===== */
