@@ -203,7 +203,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v19';
+var BUILD = 'v20';
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
@@ -507,16 +507,40 @@ function setStatus(text, online){
    前提は8/18から、状態の印(st)は8/19から配っている。**電車の中はオフラインなので取り直せない。**
    → ①古いと分かったら、オンラインなら黙って取り直す ②オフラインなら「なぜ出ないか」を画面に出す
    （黙って前提が出ないと、社長には壊れているのか未実装なのか区別できない）。 */
+/* 🔴 2026-09-12に作り直した。
+   それまでは「st が無ければ古い」＝**8/19より前のパックしか見分けられなかった。**
+   ところが 2026-09-07、社長は電車の中でこう言われている:
+     「電車モード 令和5年 一発目 **問題文なしの全て前提になってる**」
+     「令和5年を電車モードでやろうと思って、**不具合があってできず**」
+   このときのパックには st が入っていたので、**古いと判定できなかった。**
+   そして中身（令和5の本文・前提）は 2026-09-10〜12 に直してある。
+   ＝ **直っているのに、端末の中の古い写しのせいで直って見えない**という形が残る。
+   ⭐ だから「取り込んでから何日経ったか」でも見る。日付なら、中身が何であっても効く。
+   ⚠ オフラインでは取り直せないので、せめて**いつ取り込んだ版かを画面に出す**
+     （黙って古いものを出すと、社長には壊れているのか未実装かが区別できない＝8/19の教訓と同じ）。 */
+var PACK_FURUI_HI = 3;        // 3日でも経っていたら取り直す（中身はよく直るので短めでよい）
+function packAgeDays_(){
+  try{
+    var at = localStorage.getItem(atKey());
+    if(!at) return 999;                       // いつ取り込んだか分からない＝古い扱い
+    return (Date.now() - new Date(at).getTime()) / 86400000;
+  }catch(e){ return 999; }
+}
 function packIsOld_(p){
   if(!p || !p.items || !p.items.length) return false;
-  return !p.items[0].st;      // st が無い＝8/19より前に取り込んだパック
+  if(!p.items[0].st) return true;             // st が無い＝8/19より前に取り込んだパック
+  return packAgeDays_() >= PACK_FURUI_HI;     // 日付でも見る（2026-09-12）
 }
 function warnOldPack_(){
   var el2=$('syncInfo');
   if(!el2) return;
+  var at=null;
+  try{ at = localStorage.getItem(atKey()); }catch(e){}
+  var itsu = at ? fmtTime(at) : '（不明）';
   el2.innerHTML = navigator.onLine
-    ? '⏳ データが古いので取り直しています…'
-    : '⚠ このデータは古い版です（<b>前提が入っていません</b>）。電波のある所で開けば自動で入ります。';
+    ? '⏳ データが古いので取り直しています…（いま入っているのは ' + itsu + ' に取り込んだ版）'
+    : '⚠ いま入っているのは <b>' + itsu + ' に取り込んだ版</b>です。'
+      + '<br>そのあとに直したところは入っていません。電波のある所で開けば自動で入ります。';
 }
 
 /* ===== 起動 ===== */
