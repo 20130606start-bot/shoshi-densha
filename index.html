@@ -128,8 +128,10 @@
   .nav button{ flex:1; border:none; border-radius:14px; padding:15px 0; font-size:16px; font-weight:800; }
   /* v25: 「次へ」を左（左手の親指）に置いたので、**押し間違いを形で防ぐ**。
      次へ＝広く濃く／前へ＝狭く薄く。役目の重さがそのまま大きさになる。 */
-  .prev{ background:var(--card2); color:var(--sub); border:1px solid var(--line)!important;
-         flex:0 0 34%; font-size:15px; }
+  /* ⚠ ここは `.prev` だけだと効かない。すぐ上の `.nav button{flex:1}` のほうが**詳細度が高く**、
+     幅の指定が負ける（実測＝次へ127px・前へ129pxでほぼ同じだった）。`.nav .prev` で並べる。 */
+  .prev{ background:var(--card2); color:var(--sub); border:1px solid var(--line)!important; }
+  .nav .prev{ flex:0 0 32%; font-size:15px; }
   .next{ background:var(--accent2); color:#fff; }
   .next:active,.prev:active{ transform:scale(.98); }
   .barfill{ height:100%; background:linear-gradient(90deg,var(--accent),var(--maru)); width:0%; transition:width .25s; }
@@ -208,7 +210,7 @@
 /* ===== 設定 ===== */
 /* 版数。sw.js の CACHE と**同じ番号**にする（densha-deploy.js が両方まとめて上げる）。
    画面の下に出るので、社長が「新しい版が来たか」を目で確かめられる。 */
-var BUILD = 'v25';   // v23: 長い肢が下端バーに隠れていた（社長の⚠ 2026-08-18）。収まらない肢だけ23pxまで縮める
+var BUILD = 'v26';   // v23: 長い肢が下端バーに隠れていた（社長の⚠ 2026-08-18）。収まらない肢だけ23pxまで縮める
 var PACK_URL = 'https://script.google.com/macros/s/AKfycbwranP76xx9S8eiwgI35jO9mJe07evi9THjL4UPiO-KVwQ4i2x0mfLQ62tngvXwCb9dIQ/exec';
 var INBOX_URL = 'https://script.google.com/macros/s/AKfycbwsJlVtrxz0qFrs1wM7C2bRbhObPywfxuk3OgW1ilWAVNEGTlepEtvFZ193x_CaRlY-/exec';
 var INBOX_TOKEN = '5jsygj297tgspvjqe3gimz40t7evvw7ud4rep5c9';
